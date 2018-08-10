@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+PROJECT="Ludum"
+PROJECT="${PROJECT,,}"
+PROJECT="${PROJECT^}"
+
+COMPILER=${COMPILER-"clang++"}
+
+echo "Compiling with \"$COMPILER\"..."
+
+# Source and Executable Options
+MainSource="Win_${PROJECT}.cpp"
+
+# Compilation Options
+CompilerFlags="--driver-mode=cl -Zi -I ../libs/SFML/Win64/include"
+Defines="-D${PROJECT^^}_INTERNAL -D${PROJECT^^}_SLOW -D${PROJECT^^}_WINDOWS"
+LinkerFlags="/LIBPATH:../libs/SFML/Win64/lib sfml-graphics.lib sfml-window.lib sfml-system.lib kernel32.lib"
+
+if [ ! -d "../build" ];
+then
+    mkdir ../build
+fi
+
+pushd ../build > /dev/null
+
+$COMPILER $CompilerFlags $Defines ../code/$MainSource /link $LinkerFlags 2>&1 | grep "error\|warning\|undefined" | compile
+
+popd > /dev/null
