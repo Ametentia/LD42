@@ -15,6 +15,6 @@ project(SFMLTest)
 # set(SFML_DIR "<sfml root prefix>/lib/cmake/SFML")
 
 find_package(SFML 2.5 COMPONENTS graphics audio REQUIRED)
-add_executable(SFMLTest Linux_Ludum.cpp)
+add_executable(SFMLTest SFML_Ludum.cpp)
 target_link_libraries(SFMLTest sfml-graphics sfml-audio sfml-window sfml-system sfml-network)
 
