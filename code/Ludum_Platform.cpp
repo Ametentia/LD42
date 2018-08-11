@@ -16,7 +16,7 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
     result->display.setOutlineColor(sf::Color::White);
     result->display.setOutlineThickness(-2.0);
 
-    Sumo_Circle *old_head = play_state->circle_list_head;
+    Sumo_Circle *old_head =play_state->circle_list_head;
     result->next = old_head;
     if(old_head) old_head->prev = result;
 
@@ -118,7 +118,6 @@ void UpdatePlayer(Play_State *play_state, Player *player, bool control) {
     play_state->was_space = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
 }
 
-// @Fix: Resolution of the logo is broken
 void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
     logo->rate += logo->delta_rate;
     logo->opacity = Clamp(logo->opacity + DELTA * 2.5 * logo->rate, -0.1, 255);
@@ -146,6 +145,10 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                         - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
     }
 
+    if (play_state->player_count > 0) {
+        UpdatePlayer(play_state->players);
+    }
+
     if (play_state->time_since_last_circle >= 4
             || play_state->circle_list_head->radius < play_state->min_radius * 0.6)
     {
@@ -162,6 +165,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     // @Note: Rendering the circles
     Sumo_Circle *head = play_state->circle_list_head;
     head->display.setOutlineColor(sf::Color::Yellow);
+    play_state->players->display.setFillColor(sf::Color::Red);
     if (head->next) head->next->display.setOutlineColor(sf::Color::Magenta);
     while (head) {
         bool should_delete = UpdateSumoCircle(head);
@@ -172,6 +176,9 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
             centre.setFillColor(sf::Color::Red);
             context->window->draw(centre);
             context->window->draw(head->display);
+            if (CircleCheck(head->display, play_state->players->display)) {
+                play_state->players->display.setFillColor(sf::Color::Green);
+            }
             head = head->next;
         }
         else {

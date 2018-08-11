@@ -50,4 +50,14 @@ inline sf::Vector2f Normalise(sf::Vector2f v) {
     return result;
 }
 
+inline bool CircleCheck(sf::CircleShape a, sf::CircleShape b) {
+    f32 x = a.getPosition().x - b.getPosition().x;
+    f32 y = a.getPosition().y - b.getPosition().y;
+    f32 r = a.getRadius() + b.getRadius();
+    x*=x;
+    y*=y;
+    r*=r;
+    return r > x + y;
+}
+
 #endif  // LUDUM_INTRINSICS_H_
