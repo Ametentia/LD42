@@ -4,12 +4,12 @@ PROJECT="Ludum"
 PROJECT="${PROJECT,,}"
 PROJECT="${PROJECT^}"
 
-COMPILER=${COMPILER-"clang++"}
+COMPILER=${COMPILER-"clang++.exe"}
 
 echo "Compiling with \"$COMPILER\"..."
 
 # Source and Executable Options
-MainSource="Win_${PROJECT}.cpp"
+MainSource="SFML_${PROJECT}.cpp"
 
 # Compilation Options
 CompilerFlags="--driver-mode=cl -Zi -I ../libs/SFML/Win64/include"
@@ -23,6 +23,6 @@ fi
 
 pushd ../build > /dev/null
 
-$COMPILER $CompilerFlags $Defines ../code/$MainSource /link $LinkerFlags 2>&1 | grep "error\|warning\|undefined" | compile
+$COMPILER $CompilerFlags $Defines ../code/$MainSource /link $LinkerFlags 2>&1 | grep "error\|warning\|undefined" #| compile
 
 popd > /dev/null
