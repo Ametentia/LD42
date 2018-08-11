@@ -2,11 +2,14 @@
 build/
 libs/
 
+# Visual Studio Solutions
+*.sln
+
 # Prerequisites
 *.d
 
 # Compiled Object Files
-.slo
+*.slo
 *.lo
 *.o
 *.obj
