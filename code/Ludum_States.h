@@ -23,7 +23,7 @@ struct Logo_State {
         texture.loadFromFile("logo.png");
 
         display.setPosition(VIEW_WIDTH / 2.0 - VIEW_HEIGHT / 2.0, 0);
-        display.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
+        display.setSize(sf::Vector2f(VIEW_HEIGHT, VIEW_HEIGHT));
         display.setTexture(&texture);
     }
 };
