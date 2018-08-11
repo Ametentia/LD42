@@ -19,6 +19,7 @@ int main() {
 
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Ludum Dare 42",
             sf::Style::Close | sf::Style::Titlebar);
+    window.setFramerateLimit(60);
 
     sf::View viewport(sf::FloatRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
     window.setView(viewport);
@@ -33,16 +34,21 @@ int main() {
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed || sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
-                window.close();
+            switch (event.type) {
+                case sf::Event::Closed: {
+                    window.close();
+                }
+                break;
+                case sf::Event::KeyPressed: {
+                    if (event.key.code == sf::Keyboard::Escape) window.close();
+                }
+                break;
+            }
         }
 
-        if (clock.getElapsedTime().asMilliseconds() > DELTA) {
-            clock.restart();
-            window.clear();
-            UpdateRenderGame(context);
-            window.display();
-        }
+        window.clear();
+        UpdateRenderGame(context);
+        window.display();
     }
     return 0;
 }

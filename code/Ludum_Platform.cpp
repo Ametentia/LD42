@@ -19,23 +19,7 @@ void UpdatePlayer(Player *player) {
 }
 
 // @Fix: Resolution of the logo is broken
-void InitialiseLogo(Logo_State *logo) {
-    logo->rate = 0;
-    logo->delta_rate = 0.02;
-    logo->opacity = 0;
-
-    logo->texture.loadFromFile("logo.png");
-
-    logo->display.setPosition(VIEW_WIDTH / 2.0 - VIEW_HEIGHT / 2.0, 0);
-    logo->display.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
-    logo->display.setTexture(&logo->texture);
-
-    logo->initialised = true;
-}
-
 void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
-    if (!logo->initialised) InitialiseLogo(logo);
-
     logo->rate += logo->delta_rate;
     logo->opacity = Clamp(logo->opacity + DELTA * 2.5 * logo->rate, -0.1, 255);
     logo->display.setFillColor(sf::Color(255, 255, 255, logo->opacity));
@@ -45,7 +29,7 @@ void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
         State *old_state = SetState(context, CreateStateFromType(StateType_Play));
         CleanupState(old_state);
     }
-    else if (logo->rate > 20) {
+    else if (logo->rate > 75) {
         logo->delta_rate = -logo->delta_rate;
     }
 }

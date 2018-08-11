@@ -8,13 +8,24 @@ enum State_Type {
 };
 
 struct Logo_State {
-    bool initialised;
     f32 delta_rate;
     f32 rate;
     f32 opacity;
 
     sf::RectangleShape display;
     sf::Texture texture;
+
+    Logo_State() {
+        delta_rate = 1.0;
+        rate = 0;
+        opacity = 0;
+
+        texture.loadFromFile("logo.png");
+
+        display.setPosition(VIEW_WIDTH / 2.0 - VIEW_HEIGHT / 2.0, 0);
+        display.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
+        display.setTexture(&texture);
+    }
 };
 
 struct Menu_State {
@@ -30,6 +41,11 @@ struct Play_State {
 
     // @Todo: At this point I might as well to proper input
     bool was_f;
+
+    Play_State() {
+        player_count = 0;
+        was_f = false;
+    }
 };
 
 
