@@ -23,7 +23,7 @@ struct Logo_State {
         texture.loadFromFile("logo.png");
 
         display.setPosition(VIEW_WIDTH / 2.0 - VIEW_HEIGHT / 2.0, 0);
-        display.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
+        display.setSize(sf::Vector2f(VIEW_HEIGHT, VIEW_HEIGHT));
         display.setTexture(&texture);
     }
 };
@@ -49,6 +49,7 @@ struct Play_State {
 
     // @Todo: At this point I might as well to proper input
     bool was_f;
+    bool was_space;
 
     Play_State() {
         circle_list_head = 0;

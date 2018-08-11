@@ -25,6 +25,14 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
     play_state->circle_count++;
 }
 
+bool PlayerHitPlayer(Player *a, Player *b) {
+    bool result;
+    sf::Vector2f dist_line = b->position - a->position;
+    f32 radius_sum = a->radius + b->radius;
+    result = Dot(dist_line, dist_line) <= Square(radius_sum);
+    return result;
+}
+
 // Will create a new circle relative to the one given
 void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
     f32 angle = RandomFloat(0, TAU32);
@@ -72,17 +80,42 @@ void AddPlayer(Play_State *play_state, f32 x, f32 y) {
     player->position.x = x;
     player->position.y = y;
 
+    player->radius = 20;
     player->display.setRadius(20);
     player->display.setFillColor(sf::Color::Green);
 }
 
-void UpdatePlayer(Player *player) {
+void UpdatePlayer(Play_State *play_state, Player *player, bool control) {
 #define MOVE_SPEED 350
+#define DASH_SPEED 1000
     // @Debug: Nowhere near final haha
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) { player->position.y -= (MOVE_SPEED * DELTA); }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { player->position.y += (MOVE_SPEED * DELTA); }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) { player->position.x -= (MOVE_SPEED * DELTA); }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) { player->position.x += (MOVE_SPEED * DELTA); }
+    f32 speed = MOVE_SPEED;
+    if (!player->is_dashing) {
+        player->move_direction.x = player->move_direction.y = 0;
+        if (control) {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) { player->move_direction.y -= 1; }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { player->move_direction.y += 1; }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) { player->move_direction.x -= 1; }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) { player->move_direction.x += 1; }
+
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !play_state->was_space) {
+                player->is_dashing = true;
+                player->dash_time = 0.2;
+                player->dash_start = player->position;
+                speed = DASH_SPEED;
+            }
+        }
+    }
+    else {
+        player->dash_time -= DELTA;
+        player->is_dashing = player->dash_time > 0;
+        speed = DASH_SPEED;
+    }
+
+    sf::Vector2f velocity = speed * Normalise(player->move_direction);
+    player->position += DELTA * velocity;
+
+    play_state->was_space = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
 }
 
 // @Fix: Resolution of the logo is broken
@@ -113,10 +146,6 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                         - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
     }
 
-    if (play_state->player_count > 0) {
-        UpdatePlayer(play_state->players);
-    }
-
     if (play_state->time_since_last_circle >= 4
             || play_state->circle_list_head->radius < play_state->min_radius * 0.6)
     {
@@ -130,6 +159,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         play_state->time_since_last_circle = 0;
     }
 
+    // @Note: Rendering the circles
     Sumo_Circle *head = play_state->circle_list_head;
     head->display.setOutlineColor(sf::Color::Yellow);
     if (head->next) head->next->display.setOutlineColor(sf::Color::Magenta);
@@ -156,12 +186,52 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     if (play_state->circle_list_head->next)
         play_state->circle_list_head->next->display.setOutlineColor(sf::Color::White);
 
+    // @Note: Rendering the players
     for (u32 i = 0; i < play_state->player_count; ++i) {
         Player *player = play_state->players + i;
-        player->display.setPosition(player->position.x, player->position.y);
+        for (u32 j = i + 1; j < play_state->player_count; ++j) {
+            Player *player_2 = play_state->players + j;
+            if (PlayerHitPlayer(player, player_2)) {
+                if (player->is_dashing) {
+                    // @Fix: Duplicated code
+                    player_2->dash_start = player_2->position;
+                    player_2->is_dashing = true;
+                    player_2->move_direction = player->move_direction;
+                    player_2->dash_time = 0.3;
+
+                    player->move_direction = {};
+                    player->is_dashing = false;
+                }
+                else if (player_2->is_dashing) {
+
+                }
+            }
+
+        }
+
+        // @Hack: true will control the player
+        UpdatePlayer(play_state, play_state->players + i, i == 0);
+        if (player->is_dashing) {
+            player->display.setPosition(player->dash_start);
+            player->display.setFillColor(sf::Color::White);
+            context->window->draw(player->display);
+            u32 dash_iters = 3;
+            for (u32 i = 0; i < dash_iters; ++i) {
+                sf::CircleShape shape = player->display;
+                sf::Vector2f pos = (player->position - player->dash_start);
+                pos.x *= (i * (1.0 / 4.0));
+                pos.y *= (i * (1.0 / 4.0));
+
+                pos += player->dash_start;
+                shape.setPosition(pos);
+                shape.setFillColor(sf::Color(0, ((i + 1) * (255 / (dash_iters + 1))), 0));
+                context->window->draw(shape);
+                player->display.setFillColor(sf::Color::Green);
+            }
+        }
+        player->display.setPosition(player->position);
         context->window->draw(player->display);
     }
-
 
     // Post update and render increments
     play_state->time_since_last_circle += DELTA;

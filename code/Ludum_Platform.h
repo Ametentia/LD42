@@ -36,6 +36,8 @@ do { \
 #define PI32  3.14159265359f
 #define TAU32 6.28318530717958647692f
 
+// @Note: Some simple maths macros
+#define Square(x) ((x) * (x))
 #define Abs(x) ((x) < 0 ? -(x) : (x))
 #define Min(a, b) (a) < (b) ? (a) : (b)
 #define Max(a, b) (a) > (b) ? (a) : (b)
@@ -49,8 +51,23 @@ struct State;
 
 struct Player {
     u32 score;
-    sf::CircleShape display;
+
+    // The players radius may change because of special moves
+    f32 radius;
     sf::Vector2f position;
+    sf::Vector2f move_direction;
+
+    bool is_dashing;
+    f32 dash_time;
+    sf::Vector2f dash_start;
+
+    sf::CircleShape display;
+
+    Player() {
+        score = 0;
+        is_dashing = false;
+        dash_time = 0;
+    }
 };
 
 struct Sumo_Circle {

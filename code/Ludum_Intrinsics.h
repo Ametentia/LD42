@@ -1,6 +1,8 @@
 #if !defined(LUDUM_INTRINSICS_H_)
 #define LUDUM_INTRINSICS_H_
 
+#include <math.h>
+
 #ifdef _MSC_VER
     #include <intrin.h>
 #elif __llvm__ || __clang__
@@ -28,7 +30,7 @@ inline f32 Tan(f32 rad) {
 }
 
 inline f32 Dot(sf::Vector2f a, sf::Vector2f b) {
-    f32 result = a.x * b.x + a.y + b.y;
+    f32 result = a.x * b.x + a.y * b.y;
     return result;
 }
 
@@ -36,4 +38,16 @@ inline f32 Length(sf::Vector2f v) {
     f32 result = Sqrt(Dot(v, v));
     return result;
 }
+
+inline sf::Vector2f Normalise(sf::Vector2f v) {
+    sf::Vector2f result;
+    f32 len = Length(v);
+    if (len != 0) {
+        result.x = v.x / len;
+        result.y = v.y / len;
+    }
+
+    return result;
+}
+
 #endif  // LUDUM_INTRINSICS_H_
