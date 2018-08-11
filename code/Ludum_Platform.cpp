@@ -1,5 +1,5 @@
 void AddPlayer(Play_State *play, f32 x, f32 y) {
-    Assert(play->player_count < (MAX_PLAYERS - 1));
+    Assert(play->player_count < MAX_PLAYERS);
     Player *player = play->players + play->player_count++;
 
     player->position.x = x;
@@ -33,26 +33,26 @@ void InitialiseLogo(Logo_State *logo) {
     logo->initialised = true;
 }
 
-void UpdateRenderLogoState(Game_State *game_state, Logo_State *logo) {
+void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
     if (!logo->initialised) InitialiseLogo(logo);
 
     logo->rate += logo->delta_rate;
     logo->opacity = Clamp(logo->opacity + DELTA * 2.5 * logo->rate, -0.1, 255);
     logo->display.setFillColor(sf::Color(255, 255, 255, logo->opacity));
-    game_state->window->draw(logo->display);
+    context->window->draw(logo->display);
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || logo->opacity <= 0) {
-        SetState(game_state, StateType_PlayState);
+        State *old_state = SetState(context, CreateStateFromType(StateType_Play));
+        CleanupState(old_state);
     }
     else if (logo->rate > 20) {
         logo->delta_rate = -logo->delta_rate;
     }
-
 }
 
-void UpdateRenderPlayState(Game_State *game_state, Play_State *play) {
+void UpdateRenderPlayState(Game_Context *context, Play_State *play) {
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::F) && !play->was_f) {
-        AddPlayer(play, 30, 30);
+        AddPlayer(play, RandomFloat(0, VIEW_WIDTH), RandomFloat(0, VIEW_HEIGHT));
     }
 
     if (play->player_count > 0) {
@@ -62,24 +62,26 @@ void UpdateRenderPlayState(Game_State *game_state, Play_State *play) {
     for (u32 i = 0; i < play->player_count; ++i) {
         Player *player = play->players + i;
         player->display.setPosition(player->position.x, player->position.y);
-        game_state->window->draw(player->display);
+        context->window->draw(player->display);
     }
 
     play->was_f = sf::Keyboard::isKeyPressed(sf::Keyboard::F);
 }
 
-void UpdateRenderGame(Game_State *state) {
-    switch (PeekCurrentState(state)) {
+void UpdateRenderGame(Game_Context *context) {
+    State *current = PeekCurrentState(context);
+    Assert(current);
+    switch (current->type) {
         case StateType_Logo: {
-            UpdateRenderLogoState(state, &state->logo_state);
+            UpdateRenderLogoState(context, current->logo_state);
         }
         break;
         case StateType_MainMenu: {
             // @Todo
         }
         break;
-        case StateType_PlayState: {
-            UpdateRenderPlayState(state, &state->play_state);
+        case StateType_Play: {
+            UpdateRenderPlayState(context, current->play_state);
         }
         break;
         case StateType_GameOver: {
@@ -88,3 +90,4 @@ void UpdateRenderGame(Game_State *state) {
         break;
     }
 }
+

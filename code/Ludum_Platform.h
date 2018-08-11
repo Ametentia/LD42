@@ -45,90 +45,24 @@ do { \
 #define Radians(deg) ((deg) * (PI32 / 180.0f))
 #define Degrees(rad) ((rad) * (180.0f / PI32))
 
-enum State_Type {
-    StateType_Logo,
-    StateType_MainMenu,
-    StateType_PlayState,
-    StateType_GameOver
-};
-
-/*
-   @Todo: Maybe store states like this
-   struct State {
-       State_Type type;
-       union {
-           Logo_State logo_state;
-           Play_State play_state;
-           Menu_State menu_state;
-           Game_Over_State game_over_state;
-           // etc....
-       };
-
-       State *next;
-   };
-
-   Then PushState, PopState and SetState can just manipulate the linked list
-*/
+struct State;
 
 struct Player {
     sf::CircleShape display;
     sf::Vector2f position;
 };
 
-struct Logo_State {
-    bool initialised;
-    f32 delta_rate;
-    f32 rate;
-    f32 opacity;
-
-    sf::RectangleShape display;
-    sf::Texture texture;
-};
-
-struct Menu_State {
-    // @Note: Not real
-    // @Todo: Implement actual menu
-    u32 x, y;
-};
-
-#define MAX_PLAYERS 4
-struct Play_State {
-    Player players[MAX_PLAYERS];
-    u32 player_count;
-
-    // @Todo: At this point I might as well to proper input
-    bool was_f;
-};
-
-#define MAX_STATES 10
-struct Game_State {
+struct Game_Context {
     sf::RenderWindow *window;
-
-    s32 state_count;
-    State_Type current_states[MAX_STATES];
-
-    Logo_State logo_state;
-    Play_State play_state;
-    Menu_State menu_state;
+    State *current_state;
 };
 
-inline State_Type PeekCurrentState(Game_State *state) {
-    State_Type result = state->current_states[state->state_count - 1];
+inline f32 RandomFloat(f32 min, f32 max) {
+    f32 result = 0;
+    f32 rnd = (rand() / cast(f32) RAND_MAX);
+
+    result = (min + (rnd * (max - min)));
     return result;
-}
-
-inline void PushState(Game_State *state, State_Type type) {
-    Assert(state->state_count < MAX_STATES);
-    state->current_states[state->state_count++] = type;
-}
-
-inline void PopState(Game_State *state) {
-    state->state_count--;
-}
-
-inline void SetState(Game_State *state, State_Type type) {
-    PopState(state);
-    PushState(state, type);
 }
 
 #endif  // LUDUM_PLATFORM_H_
