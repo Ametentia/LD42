@@ -48,8 +48,22 @@ do { \
 struct State;
 
 struct Player {
+    u32 score;
     sf::CircleShape display;
     sf::Vector2f position;
+};
+
+struct Sumo_Circle {
+    sf::Vector2f position;
+    f32 radius;
+    f32 shrink_delta;
+
+    sf::CircleShape display;
+
+    Sumo_Circle *next;
+    Sumo_Circle *prev;
+
+    Sumo_Circle() {}
 };
 
 struct Game_Context {

@@ -10,6 +10,7 @@
 #define DELTA (1.0f / 60.0f)
 
 #include "Ludum_Platform.h"
+#include "Ludum_Intrinsics.h"
 #include "Ludum_States.h"
 #include "Ludum_Platform.cpp"
 

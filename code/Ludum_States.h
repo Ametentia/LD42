@@ -35,14 +35,25 @@ struct Menu_State {
 };
 
 #define MAX_PLAYERS 4
+#define MAX_CIRCLES 8
 struct Play_State {
     Player players[MAX_PLAYERS];
-    u32 player_count;
+    s32 player_count;
+
+    Sumo_Circle *circle_list_head;
+    u32 circle_count;
+    f32 time_since_last_circle;
+
+    f32 min_radius;
+    f32 max_radius;
 
     // @Todo: At this point I might as well to proper input
     bool was_f;
 
     Play_State() {
+        circle_list_head = 0;
+        time_since_last_circle = 0;
+        circle_count = 0;
         player_count = 0;
         was_f = false;
     }
