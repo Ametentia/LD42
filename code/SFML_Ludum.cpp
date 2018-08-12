@@ -70,7 +70,7 @@ int main() {
         while (window.pollEvent(event)) {
             switch (event.type) {
                 case sf::Event::Closed: {
-                    window.close();
+                    current->requested_quit = true;
                 }
                 break;
                 case sf::Event::JoystickConnected: {
@@ -100,8 +100,25 @@ int main() {
                 break;
                 case sf::Event::KeyPressed: {
                     Game_Controller *kbd_current = GetGameController(current, 0);
-                    Game_Controller *kbd_prev    = GetGameController(current, 0);
+                    Game_Controller *kbd_prev    = GetGameController(prev, 0);
                     switch (event.key.code) {
+                        // Movement
+                        case sf::Keyboard::W: {
+                            SFMLProcessGameButton(&kbd_current->move_up, &kbd_prev->move_up, true);
+                        }
+                        break;
+                        case sf::Keyboard::S: {
+                            SFMLProcessGameButton(&kbd_current->move_down, &kbd_prev->move_down, true);
+                        }
+                        break;
+                        case sf::Keyboard::A: {
+                            SFMLProcessGameButton(&kbd_current->move_left, &kbd_prev->move_left, true);
+                        }
+                        break;
+                        case sf::Keyboard::D: {
+                            SFMLProcessGameButton(&kbd_current->move_right, &kbd_prev->move_right, true);
+                        }
+                        break;
                         // Actions
                         case sf::Keyboard::Space: {
                             SFMLProcessGameButton(&kbd_current->action_bottom, &kbd_prev->action_bottom, true);
@@ -134,8 +151,25 @@ int main() {
                 break;
                 case sf::Event::KeyReleased: {
                     Game_Controller *kbd_current = GetGameController(current, 0);
-                    Game_Controller *kbd_prev    = GetGameController(current, 0);
+                    Game_Controller *kbd_prev    = GetGameController(prev, 0);
                     switch (event.key.code) {
+                        // Movement
+                        case sf::Keyboard::W: {
+                            SFMLProcessGameButton(&kbd_current->move_up, &kbd_prev->move_up, false);
+                        }
+                        break;
+                        case sf::Keyboard::S: {
+                            SFMLProcessGameButton(&kbd_current->move_down, &kbd_prev->move_down, false);
+                        }
+                        break;
+                        case sf::Keyboard::A: {
+                            SFMLProcessGameButton(&kbd_current->move_left, &kbd_prev->move_left, false);
+                        }
+                        break;
+                        case sf::Keyboard::D: {
+                            SFMLProcessGameButton(&kbd_current->move_right, &kbd_prev->move_right, false);
+                        }
+                        break;
                         // Actions
                         case sf::Keyboard::Space: {
                             SFMLProcessGameButton(&kbd_current->action_bottom, &kbd_prev->action_bottom, false);
@@ -169,10 +203,14 @@ int main() {
             }
         }
 
-        window.clear();
+        window.clear(sf::Color(231, 191, 120));
+        // @Todo: Variable delta time
+        current->delta_time = DELTA;
         context->input = current;
         UpdateRenderGame(context);
         window.display();
+
+        if (current->requested_quit) { window.close(); }
 
         Swap(Game_Input, current, prev);
     }

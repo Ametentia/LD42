@@ -23,6 +23,14 @@ inline f32 RandomFloat(f32 min, f32 max) {
     return result;
 }
 
+inline u8 RandomInt(u8 min, u8 max) {
+    u8 result = 0;
+    f32 rnd = (rand() / cast(f32) RAND_MAX);
+
+    result = (u8)(min + (rnd * (max - min)));
+    return result;
+}
+
 inline f32 Dot(sf::Vector2f a, sf::Vector2f b) {
     f32 result = a.x * b.x + a.y * b.y;
     return result;

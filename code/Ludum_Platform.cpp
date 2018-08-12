@@ -18,14 +18,14 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
     result->display.setOutlineThickness(-2.0);
 
     result->inner.setRadius(radius - 3);
-    result->inner.setOrigin(radius - 3 , radius -3);
+    result->inner.setOrigin(radius - 3 , radius - 3);
     result->inner.setPosition(result->position);
 
     result->inner.setFillColor(sf::Color::Black);
     result->inner.setOutlineColor(sf::Color::Transparent);
     result->inner.setOutlineThickness(-2.0);
 
-    Sumo_Circle *old_head = play_state->circle_list_head;
+    Sumo_Circle *old_head = play_state->circle_list;
     result->next = old_head;
     if(old_head) old_head->prev = result;
 
@@ -55,146 +55,237 @@ void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
     AddSumoCircle(play_state, x, y, radius, base->shrink_delta + RandomFloat(-0.1, 0.1));
 }
 
-void RemoveSumoCircle(Play_State *play_state, Sumo_Circle *circle) {
-    if (circle->next) circle->next->prev = circle->prev;
-    if (circle->prev) circle->prev->next = circle->next;
+void RemoveSumoCircles(Play_State *play_state) {
+    Sumo_Circle *current = play_state->circle_list;
+    while (current) {
+        if (current->should_delete) {
+            if (current->next) current->next->prev = current->prev;
+            if (current->prev) current->prev->next = current->next;
 
-    play_state->circle_count--;
-    delete circle;
-}
+            Sumo_Circle *prev = current;
+            current = prev->next;
 
-bool UpdateSumoCircle(Sumo_Circle *circle) {
-    circle->radius -= circle->shrink_delta * DELTA;
-    if (circle->radius <= 10) {
-        return true;
+            play_state->circle_count--;
+            delete current;
+        }
+        else {
+            current = current->next;
+        }
     }
-
-    circle->display.setRadius(circle->radius);
-    circle->display.setOrigin(circle->radius, circle->radius);
-    circle->inner.setRadius(circle->radius - 3);
-    circle->inner.setOrigin(circle->radius - 3, circle->radius - 3);
-    return false;
 }
 
-void AddPlayer(Play_State *play_state, f32 x, f32 y) {
+void UpdateSumoCircles(Play_State *play_state, f32 delta_time) {
+    Sumo_Circle *current = play_state->circle_list;
+    while (current) {
+        current->radius -= current->shrink_delta * delta_time;
+        current->display.setRadius(current->radius);
+        current->display.setOrigin(current->radius, current->radius);
+        current->inner.setRadius(current->radius - 3);
+        current->inner.setOrigin(current->radius - 3, current->radius - 3);
+
+        current->should_delete = current->radius <= 10;
+        current = current->next;
+    }
+}
+
+void AddPlayer(Play_State *play_state, Player_Type type, f32 x, f32 y) {
     if (play_state->player_count >= MAX_PLAYERS) return;
     Player *player = play_state->players + play_state->player_count++;
 
-    player->position.x = x;
-    player->position.y = y;
-
+    player->type = type;
+    player->position = { x, y };
     player->radius = 20;
     player->display.setRadius(20);
-    player->display.setFillColor(sf::Color::Green);
+
+    switch (player->type) {
+        case PlayerType_SumoCat: {
+            player->display.setFillColor(sf::Color::White);
+            player->push_strength = 100;
+            player->move_speed = 250;
+            player->dash_length = 0.1;
+        }
+        break;
+        case PlayerType_LuchadorCat: {
+            player->display.setFillColor(sf::Color(24, 213, 75));
+
+            player->move_speed = 250;
+            player->push_strength = 60;
+            player->dash_length = 0.2;
+        }
+        break;
+        case PlayerType_AstroCat: {
+            player->display.setFillColor(sf::Color(113, 229, 255));
+
+            player->move_speed = 450;
+            player->push_strength = 10;
+            player->dash_length = 0.4;
+        }
+        break;
+        case PlayerType_DevilCat: {
+            player->display.setFillColor(sf::Color::Red);
+
+            // @Todo
+            player->move_speed = 350;
+            player->push_strength = 20;
+            player->dash_length = 0.2;
+        }
+        break;
+    }
     player->display.setOrigin(20, 20);
 }
 
-void UpdatePlayer(Play_State *play_state, Player *player, bool control) {
 #define MOVE_SPEED 350
 #define DASH_SPEED 1000
-    // @Debug: Nowhere near final haha
-    f32 speed = MOVE_SPEED;
-    if (!player->is_dashing) {
-        player->move_direction.x = player->move_direction.y = 0;
-        if (control) {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) { player->move_direction.y -= 1; }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { player->move_direction.y += 1; }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) { player->move_direction.x -= 1; }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) { player->move_direction.x += 1; }
 
-#if 0
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !play_state->was_space) {
-                player->is_dashing = true;
-                player->dash_time = 0.2;
-                player->dash_start = player->position;
-                speed = DASH_SPEED;
-            }
-#endif
-        }
-    }
-    else {
-        player->dash_time -= DELTA;
+void DashPlayer(Player *player, f32 dash_time) {
+    player->is_dashing = true;
+    player->dash_time = dash_time;
+    player->dash_start = player->position;
+}
+
+void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time) {
+    f32 speed = player->move_speed;
+    bool has_input = player->is_dashing;
+    if (player->is_dashing) {
+        player->dash_time -= delta_time;
         player->is_dashing = player->dash_time > 0;
         speed = DASH_SPEED;
     }
+    else {
+        sf::Vector2f move_direction = player->move_direction;
+        if (controller->is_controller) {
+            move_direction = Normalise(controller->left_stick);
+        }
+        else {
+            // @Hack: Find a better way of doing this?
+            has_input = IsButtonPressed(controller->move_up) || IsButtonPressed(controller->move_down) ||
+                IsButtonPressed(controller->move_left) || IsButtonPressed(controller->move_right);
 
-    sf::Vector2f velocity = speed * Normalise(player->move_direction);
-    player->position += DELTA * velocity;
+            u32 control_offset = player->reversed_controls ? 1 : 0;
+            if (IsButtonPressed(controller->buttons[0 + control_offset]))    { move_direction.y -= 1; }
+            if (IsButtonPressed(controller->buttons[1 - control_offset]))  { move_direction.y += 1; }
+            if (IsButtonPressed(controller->buttons[2 + control_offset]))  { move_direction.x -= 1; }
+            if (IsButtonPressed(controller->buttons[3 - control_offset])) { move_direction.x += 1; }
+
+            if (JustButtonPressed(controller->action_bottom)) {
+                speed = DASH_SPEED;
+                DashPlayer(player, 0.2);
+            }
+        }
+
+        move_direction = Normalise(move_direction);
+        player->move_direction = move_direction;
+    }
+
+    player->position += speed * delta_time * player->move_direction;
+    if (!has_input) { player->move_direction = {}; }
+
+    player->score_time += delta_time;
+    if (player->score_time >= 1) {
+        player->score += player->hit_count;
+        player->score_time = 0;
+    }
 }
 
-void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
-    Game_Input *input = context->input;
-
-    // Update Players based off input
-    for (u32 i = 0; i < play_state->player_count; ++i) {
-        Player *player = play_state->players + i;
-        Game_Controller *controller = GetGameController(input, i);
-        if (controller->is_connected) {
-            UpdatePlayer(player, controller);
-            CheckBounds(play_state->circle_list, player);
+void CheckBounds(Sumo_Circle *circle_list, Player *player) {
+    u32 in_count = 0;
+    if (circle_list && player) {
+        Sumo_Circle *circle = circle_list;
+        while (circle) {
+            if (SumoCircleHitPlayer(circle, player)) in_count++;
+            circle = circle->next;
         }
 
-        play_state->min_radius = 320;
-        play_state->max_radius = 500;
-        AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
-        CleanupState(old_state);
+        player->alive = in_count > 0;
+        player->hit_count = in_count;
+    }
+}
+
+void ResolveCollision(Player *a, Player *b) {
+    sf::Vector2f impact = a->position - b->position;
+    impact = Normalise(impact);
+
+    f32 impact_a = Abs(Dot(a->move_direction, impact));
+    f32 impact_b = Abs(Dot(b->move_direction, impact));
+
+    sf::Vector2f deflect_a = impact_a *  impact;
+    sf::Vector2f deflect_b = impact_b * -impact;
+
+    a->move_direction += (deflect_a - deflect_b);
+    b->move_direction += (deflect_b - deflect_a);
+
+
+    if (a->is_dashing && b->is_dashing) {
+        a->dash_time = 0.05f;
+        b->dash_time = 0.05f;
+    }
+    else if (a->is_dashing) {
+        f32 push_factor = a->push_strength / 100.0;
+        a->is_dashing = false;
+        DashPlayer(b, 0.3 * push_factor);
+    }
+    else if (b->is_dashing) {
+        f32 push_factor = b->push_strength / 250.0;
+        b->is_dashing = false;
+        DashPlayer(a, 0.3 * push_factor);
     }
 
-    // Update any AI entities involved
+}
+
+void CheckCollisions(Play_State *play_state) {
+    // Every Player
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        Player *a = play_state->players + i;
+        // Against Every Player
+        for (u32 j = i + 1; j < play_state->player_count; ++j) {
+            Player *b = play_state->players + j;
+            if (PlayerHitPlayer(a, b)) { ResolveCollision(a, b); }
+        }
+
+        // Against Every Bot
+        for (u32 j = 0; j < play_state->bot_count; ++j) {
+            Player *b = play_state->bots + j;
+            if (PlayerHitPlayer(a, b)) { ResolveCollision(a, b); }
+        }
+    }
+
+    // Every Bot
     for (u32 i = 0; i < play_state->bot_count; ++i) {
-        Player *bot = play_state->bots + i;
-        UpdateBot(bot);
-        CheckBounds(play_state->circle_list, bot);
+        Player *a = play_state->bots + i;
+        // Against Every Bot
+        for (u32 j = i + 1; j < play_state->bot_count; ++j) {
+            Player *b = play_state->bots + j;
+            if (PlayerHitPlayer(a, b)) { ResolveCollision(a, b); }
+        }
+    }
+}
+
+void RenderSumoCircles(Game_Context *context, Play_State *play_state) {
+    Sumo_Circle *current = play_state->circle_list;
+    while (current) {
+        f32 alpha = 1;
+        f32 value = Lerp(255, 0, alpha);
+        value = Clamp(value, 0, 255);
+        current->display.setOutlineColor(sf::Color(255, value, value));
+        context->window->draw(current->display);
+        // @Bug: This trips 'Fatal Error' in ucrtbase.dll sometimes will investigate
+        current = current->next;
     }
 
-    // Check for any collisions
-    CheckCollisions(play_state);
-
-    // Spawn new circles when necessary
-    SpawnSumoCircles(play_state);
-
-    // Render Sumo Circles
-    RenderSumoCircles(play_state->circle_list);
-
-    // Render Dash Trails. Before rendering actual entities so the entities are still on top
-    // when dashing close to entities
-    RenderDashTrails(play_state);
-
-    // Finally, render entities
-    RenderEntities(play_state);
+    current = play_state->circle_list;
+    while (current) {
+        context->window->draw(current->inner);
+        current = current->next;
+    }
 
 #if 0
-    if (play_state->time_since_last_circle >= 4
-            || play_state->circle_list_head->radius < play_state->min_radius * 0.4)
-    {
-        if(play_state->circle_list_head->pattern == Sumo_Circle::Pattern::Random) {
-            if (play_state->circle_list_head && play_state->circle_count <= 3) {
-                AddSumoCircle(play_state, play_state->circle_list_head);
-            } else {
-                AddSumoCircle(play_state, (2 * play_state->max_radius) + (0.1 * VIEW_WIDTH),
-                              (2 * play_state->max_radius) + (0.1 * VIEW_HEIGHT), play_state->max_radius);
-            }
-            play_state->time_since_last_circle = 0;
-        }
-        else if(play_state->circle_list_head->pattern == Sumo_Circle::Pattern::Circle) {
-            AddSumoCircle(play_state, play_state->circle_list_head);
-            play_state->time_since_last_circle=3.2f;
-        }
-    }
 
-    // @Note: Rendering the circles
-    Sumo_Circle *head = play_state->circle_list_head;
+ // @Note: Rendering the circles
     head->display.setOutlineColor(sf::Color::Yellow);
     if (head->next) head->next->display.setOutlineColor(sf::Color::Magenta);
 
-    // @Todo: Please make this more elegant, I'm tired and can't find a way with less than
-    // two variables stored per player...
-    for (u32 i = 0; i < play_state->player_count; ++i) {
-        if(!play_state->players[i].perma_dead)
-            play_state->players[i].frame_alive = false;
-    }
     while (head) {
-        bool should_delete = UpdateSumoCircle(head);
+        bool should_delete = UpdateSumoCircle(head, input->delta_time);
         if (!should_delete) {
             sf::CircleShape centre(10);
             centre.setPosition(head->position);
@@ -202,83 +293,154 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
             centre.setFillColor(sf::Color::Red);
             context->window->draw(centre);
             context->window->draw(head->display);
-            for (u32 i = 0; i < play_state->player_count; ++i) {
-                if (CircleCheck(*head, play_state->players[i]))
-                    play_state->players[i].frame_alive = true;
-            }
             head = head->next;
         }
         else {
             Sumo_Circle *old = head;
-            Assert(old != play_state->circle_list_head || play_state->circle_list_head->next);
+            Assert(old != play_state->circle_list || play_state->circle_list->next);
             head = head->next;
             RemoveSumoCircle(play_state, old);
         }
     }
-    head = play_state->circle_list_head;
+
+    head = play_state->circle_list;
     while(head) {
         context->window->draw(head->inner);
         head = head-> next;
     }
+#endif
+}
 
-
-    // @Todo: Clear up this check, it finds if the player died, doesn't seem very elegant
+void RenderEntities(Game_Context *context, Play_State *play_state) {
     for (u32 i = 0; i < play_state->player_count; ++i) {
-        if(!play_state->players[i].frame_alive)
-            play_state->players[i].perma_dead = true;
+        Player *player = play_state->players + i;
+        if (player->alive) {
+            player->display.setPosition(player->position);
+            context->window->draw(player->display);
+        }
     }
 
-    play_state->circle_list_head->display.setOutlineColor(sf::Color::White);
-    if (play_state->circle_list_head->next)
-        play_state->circle_list_head->next->display.setOutlineColor(sf::Color::White);
+    for (u32 i = 0; i < play_state->bot_count; ++i) {
+        Player *bot = play_state->players + i;
+        if (bot->alive) {
+            bot->display.setPosition(bot->position);
+            context->window->draw(bot->display);
+        }
+    }
+}
+
+void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
+    Game_Input *input = context->input;
+
+    // @Debug: Adding Players and quit on escape
+    {
+        Game_Controller *controller = GetGameController(input, 0);
+        if (JustButtonPressed(controller->action_top)) {
+            AddPlayer(play_state, cast(Player_Type) RandomInt(0, 4),
+                    RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
+                        VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
+                            - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
+        }
+
+        if (JustButtonPressed(controller->select)) {
+            Player *player = play_state->players;
+            player->reversed_controls = !player->reversed_controls;
+        }
+
+        if (IsButtonPressed(controller->start)) input->requested_quit = true;
+    }
+
+
+    // Check for any collisions
+    CheckCollisions(play_state);
+
+    // Update Players based off input
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        Player *player = play_state->players + i;
+        Game_Controller *controller = GetGameController(input, i);
+        if (player->alive) {
+            UpdatePlayer(player, controller, input->delta_time);
+            CheckBounds(play_state->circle_list, player);
+        }
+    }
+
+
+#if 0
+    // Update any AI entities involved
+    for (u32 i = 0; i < play_state->bot_count; ++i) {
+        Player *bot = play_state->bots + i;
+        UpdateBot(bot);
+        CheckBounds(play_state->circle_list, bot);
+    }
+#endif
+    // Update Sumo Circles
+    UpdateSumoCircles(play_state, input->delta_time);
+
+    // Remove any circles that have become too small
+    RemoveSumoCircles(play_state);
+#if 0
+    // Spawn new circles when necessary
+    //SpawnSumoCircles(play_state);
+
+    // Render Dash Trails. Before rendering actual entities so the entities are still on top
+    // when dashing close to entities
+    RenderDashTrails(play_state);
+#else
+
+    // Render Sumo Circles
+    RenderSumoCircles(context, play_state);
+
+
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        Player *player = play_state->players + i;
+        char buffer[256];
+        snprintf(buffer, 256, "Player [%d] Score: %d\n", i + 1, player->score);
+        sf::Text text;
+        text.setFont(play_state->display_font);
+        text.setString(buffer);
+        text.setCharacterSize(24);
+
+        text.setPosition(10, 35 * i);
+
+        context->window->draw(text);
+    }
+
+    // @Todo: Spawn Sumo circles
+    if (play_state->time_since_last_circle >= 4
+        || play_state->circle_list->radius < play_state->min_radius * 0.4)
+    {
+        if(play_state->circle_list->pattern == Sumo_Circle::Pattern::Random) {
+            if (play_state->circle_list && play_state->circle_count <= 3) {
+                AddSumoCircle(play_state, play_state->circle_list);
+            } else {
+                AddSumoCircle(play_state, (2 * play_state->max_radius) + (0.1 * VIEW_WIDTH),
+                              (2 * play_state->max_radius) + (0.1 * VIEW_HEIGHT), play_state->max_radius);
+            }
+            play_state->time_since_last_circle = 0;
+        }
+        else if(play_state->circle_list->pattern == Sumo_Circle::Pattern::Circle) {
+            AddSumoCircle(play_state, play_state->circle_list);
+            play_state->time_since_last_circle=3.2f;
+        }
+    }
+
+
+
+
+
+    play_state->circle_list->display.setOutlineColor(sf::Color::White);
+    if (play_state->circle_list->next)
+        play_state->circle_list->next->display.setOutlineColor(sf::Color::White);
 
     // @Note: Rendering the players
     for (u32 i = 0; i < play_state->player_count; ++i) {
         Player *player = play_state->players + i;
-        for (u32 j = i + 1; j < play_state->player_count; ++j) {
-            Player *player_2 = play_state->players + j;
-            if (PlayerHitPlayer(player, player_2)) {
-                sf::Vector2f impactVector(player_2->position.x - player->position.x, player_2->position.y - player->position.y);
-                sf::Vector2f impactVectorNorm = Normalise(impactVector);
+        if (!player->alive) continue;
 
-                f32 dotImpact1 = Absolute(Dot(player->move_direction, impactVectorNorm));
-                f32 dotImpact2 = Absolute(Dot(player_2->move_direction,  impactVectorNorm));
+//        UpdatePlayer(play_state->players + i, GetGameController(input, i), input->delta_time);
 
-                sf::Vector2f deflect(-impactVectorNorm.x * dotImpact2, -impactVectorNorm.y  * dotImpact2);
-                sf::Vector2f deflect2(impactVectorNorm.x * dotImpact1, impactVectorNorm.y  * dotImpact1);
-
-                sf::Vector2f p1Final(player->move_direction.x + deflect.x - deflect2.x, player->move_direction.y + deflect.y - deflect2.y);
-                sf::Vector2f p2Final(player_2->move_direction.x + deflect2.x - deflect.x, player_2->move_direction.y + deflect2.y - deflect.y);
-
-                player->move_direction = p1Final;
-                player_2->move_direction = p2Final;
-
-                if (player->is_dashing) {
-                    // @Fix: Duplicated code
-                    player_2->dash_start = player_2->position;
-                    player_2->is_dashing = true;
-                    player_2->dash_time = player->dash_time;
-
-                    player->is_dashing = false;
-                }
-                // @Todo: sort out cases, e.g. both players dashing
-                else if (player_2->is_dashing) {
-                    // @Fix: Duplicated code
-                    player->dash_start = player_2->position;
-                    player->is_dashing = true;
-                    player->move_direction = player_2->move_direction;
-                    player->dash_time = 0.3;
-
-                    player_2->move_direction = {};
-                    player_2->is_dashing = false;
-                }
-            }
-
-        }
-
-        // @Hack: true will control the player
-        UpdatePlayer(play_state, play_state->players + i, i == 0);
-        if (player->is_dashing && !player->perma_dead) {
+        // @Todo: Dash Trails seperately
+        if (player->is_dashing) {
             player->display.setPosition(player->dash_start);
             player->display.setFillColor(sf::Color::White);
             context->window->draw(player->display);
@@ -296,32 +458,27 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                 player->display.setFillColor(sf::Color::Green);
             }
         }
-        if(!player->perma_dead) {
-            player->display.setPosition(player->position);
-            context->window->draw(player->display);
-        }
     }
+    // Finally, render entities
+    RenderEntities(context, play_state);
 
     // Post update and render increments
-    play_state->time_since_last_circle += DELTA;
-    play_state->was_f = sf::Keyboard::isKeyPressed(sf::Keyboard::F);
+    play_state->time_since_last_circle += input->delta_time;
 #endif
+}
 
 
 // @Note: Introduction logo game state
 void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
+    Game_Input *input = context->input;
+    context->window->clear();
     logo->rate += logo->delta_rate;
-    logo->opacity = Clamp(logo->opacity + DELTA * 2.5 * logo->rate, -0.1, 255);
+    logo->opacity = Clamp(logo->opacity + input->delta_time * 2.5 * logo->rate, -0.1, 255);
     logo->display.setFillColor(sf::Color(255, 255, 255, logo->opacity));
     context->window->draw(logo->display);
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || logo->opacity <= 0) {
-        State *old_state = SetState(context, CreateStateFromType(StateType_Play));
-        Play_State *play_state = context->current_state->play_state;
-
-        play_state->min_radius = 120;
-        play_state->max_radius = 500;
-        AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
+        State *old_state = SetState(context, CreateStateFromType(StateType_MainMenu));
         CleanupState(old_state);
     }
     else if (logo->rate > 75) {
@@ -329,6 +486,43 @@ void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
     }
 }
 
+void UpdateRenderMenuState(Game_Context *context, Menu_State *menu_state) {
+    Game_Input *input = context->input;
+    Game_Controller *controller = GetGameController(input, 0);
+    for (u32 i = 0; i < ArrayCount(controller->buttons); ++i) {
+        if (JustButtonPressed(controller->buttons[i])) {
+            State *old_state = SetState(context, CreateStateFromType(StateType_Play));
+            Play_State *play_state = context->current_state->play_state;
+
+            play_state->min_radius = 320;
+            play_state->max_radius = 500;
+            AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
+            CleanupState(old_state);
+            return;
+        }
+    }
+
+    context->window->draw(menu_state->background_shape);
+    if (menu_state->text_time > 0.6) {
+        menu_state->show_text = !menu_state->show_text;
+        menu_state->text_time = 0;
+    }
+
+    if (menu_state->show_text) {
+        sf::Text text;
+        text.setFont(menu_state->display_font);
+        text.setCharacterSize(60);
+        text.setFillColor(sf::Color(255, 25, 25));
+        text.setString("Start Game!");
+        text.setStyle(sf::Text::Bold | sf::Text::Underlined);
+        text.setPosition(790, 850);
+
+        context->window->draw(text);
+    }
+
+
+    menu_state->text_time += input->delta_time;
+}
 
 void UpdateRenderGame(Game_Context *context) {
     State *current = PeekCurrentState(context);
@@ -339,7 +533,7 @@ void UpdateRenderGame(Game_Context *context) {
         }
         break;
         case StateType_MainMenu: {
-            // @Todo
+            UpdateRenderMenuState(context, current->menu_state);
         }
         break;
         case StateType_Play: {
