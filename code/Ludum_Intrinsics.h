@@ -50,14 +50,21 @@ inline sf::Vector2f Normalise(sf::Vector2f v) {
     return result;
 }
 
-inline bool CircleCheck(sf::CircleShape a, sf::CircleShape b) {
-    f32 x = a.getPosition().x - b.getPosition().x;
-    f32 y = a.getPosition().y - b.getPosition().y;
-    f32 r = a.getRadius() + b.getRadius();
-    x*=x;
-    y*=y;
-    r*=r;
-    return r > x + y;
+inline bool CircleCheck(Sumo_Circle a, Player b) {
+    sf::Vector2f dis(a.position - b.position);
+    f32 radius = a.radius + b.radius;
+    return Dot(dis, dis) <= Square(radius);
+}
+
+inline f32 Absolute(f32 a) {
+    if(a < 0) {
+        return -a;
+    }
+    return a;
+}
+
+inline bool Offscreen(sf::Vector2f a) {
+    return a.x > VIEW_WIDTH || a.x < 0 || a.y > VIEW_HEIGHT || a.y < 0;
 }
 
 #endif  // LUDUM_INTRINSICS_H_

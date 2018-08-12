@@ -2,6 +2,7 @@
 void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_delta = RandomFloat(15, 50)) {
     Sumo_Circle *result = new Sumo_Circle;
 
+
     result->radius = radius;
     result->position.x = x;
     result->position.y = y;
@@ -16,6 +17,14 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
     result->display.setOutlineColor(sf::Color::White);
     result->display.setOutlineThickness(-2.0);
 
+    result->inner.setRadius(radius - 3);
+    result->inner.setOrigin(radius - 3 , radius -3);
+    result->inner.setPosition(result->position);
+
+    result->inner.setFillColor(sf::Color::Black);
+    result->inner.setOutlineColor(sf::Color::Transparent);
+    result->inner.setOutlineThickness(-2.0);
+
     Sumo_Circle *old_head =play_state->circle_list_head;
     result->next = old_head;
     if(old_head) old_head->prev = result;
@@ -26,6 +35,8 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
 }
 
 bool PlayerHitPlayer(Player *a, Player *b) {
+#define MOVE_SPEED 350
+#define DASH_SPEED 1000
     bool result;
     sf::Vector2f dist_line = b->position - a->position;
     f32 radius_sum = a->radius + b->radius;
@@ -70,6 +81,8 @@ bool UpdateSumoCircle(Sumo_Circle *circle) {
 
     circle->display.setRadius(circle->radius);
     circle->display.setOrigin(circle->radius, circle->radius);
+    circle->inner.setRadius(circle->radius - 3);
+    circle->inner.setOrigin(circle->radius - 3, circle->radius - 3);
     return false;
 }
 
@@ -83,6 +96,7 @@ void AddPlayer(Play_State *play_state, f32 x, f32 y) {
     player->radius = 20;
     player->display.setRadius(20);
     player->display.setFillColor(sf::Color::Green);
+    player->display.setOrigin(20, 20);
 }
 
 void UpdatePlayer(Play_State *play_state, Player *player, bool control) {
@@ -128,7 +142,7 @@ void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
         State *old_state = SetState(context, CreateStateFromType(StateType_Play));
         Play_State *play_state = context->current_state->play_state;
 
-        play_state->min_radius = 120;
+        play_state->min_radius = 320;
         play_state->max_radius = 500;
         AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
         CleanupState(old_state);
@@ -145,28 +159,36 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                         - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
     }
 
-    if (play_state->player_count > 0) {
-        UpdatePlayer(play_state->players);
-    }
 
     if (play_state->time_since_last_circle >= 4
-            || play_state->circle_list_head->radius < play_state->min_radius * 0.6)
+            || play_state->circle_list_head->radius < play_state->min_radius * 0.4)
     {
-        if (play_state->circle_list_head && play_state->circle_count <= 3) {
+        if(play_state->circle_list_head->pattern == Sumo_Circle::Pattern::Random) {
+            if (play_state->circle_list_head && play_state->circle_count <= 3) {
+                AddSumoCircle(play_state, play_state->circle_list_head);
+            } else {
+                AddSumoCircle(play_state, (2 * play_state->max_radius) + (0.1 * VIEW_WIDTH),
+                              (2 * play_state->max_radius) + (0.1 * VIEW_HEIGHT), play_state->max_radius);
+            }
+            play_state->time_since_last_circle = 0;
+        }
+        else if(play_state->circle_list_head->pattern == Sumo_Circle::Pattern::Circle) {
             AddSumoCircle(play_state, play_state->circle_list_head);
+            play_state->time_since_last_circle=3.2f;
         }
-        else {
-            AddSumoCircle(play_state, (2 * play_state->max_radius) + (0.1 * VIEW_WIDTH),
-                    (2 * play_state->max_radius) + (0.1 * VIEW_HEIGHT), play_state->max_radius);
-        }
-        play_state->time_since_last_circle = 0;
     }
 
     // @Note: Rendering the circles
     Sumo_Circle *head = play_state->circle_list_head;
     head->display.setOutlineColor(sf::Color::Yellow);
-    play_state->players->display.setFillColor(sf::Color::Red);
     if (head->next) head->next->display.setOutlineColor(sf::Color::Magenta);
+
+    // @Todo: Please make this more elegant, I'm tired and can't find a way with less than
+    // two variables stored per player...
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        if(!play_state->players[i].perma_dead)
+            play_state->players[i].frame_alive = false;
+    }
     while (head) {
         bool should_delete = UpdateSumoCircle(head);
         if (!should_delete) {
@@ -176,8 +198,9 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
             centre.setFillColor(sf::Color::Red);
             context->window->draw(centre);
             context->window->draw(head->display);
-            if (CircleCheck(head->display, play_state->players->display)) {
-                play_state->players->display.setFillColor(sf::Color::Green);
+            for (u32 i = 0; i < play_state->player_count; ++i) {
+                if (CircleCheck(*head, play_state->players[i]))
+                    play_state->players[i].frame_alive = true;
             }
             head = head->next;
         }
@@ -187,6 +210,18 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
             head = head->next;
             RemoveSumoCircle(play_state, old);
         }
+    }
+    head = play_state->circle_list_head;
+    while(head) {
+        context->window->draw(head->inner);
+        head = head-> next;
+    }
+
+
+    // @Todo: Clear up this check, it finds if the player died, doesn't seem very elegant
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        if(!play_state->players[i].frame_alive)
+            play_state->players[i].perma_dead = true;
     }
 
     play_state->circle_list_head->display.setOutlineColor(sf::Color::White);
@@ -199,16 +234,30 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         for (u32 j = i + 1; j < play_state->player_count; ++j) {
             Player *player_2 = play_state->players + j;
             if (PlayerHitPlayer(player, player_2)) {
+                sf::Vector2f impactVector(player_2->position.x - player->position.x, player_2->position.y - player->position.y);
+                sf::Vector2f impactVectorNorm = Normalise(impactVector);
+
+                f32 dotImpact1 = Absolute(Dot(player->move_direction, impactVectorNorm));
+                f32 dotImpact2 = Absolute(Dot(player_2->move_direction,  impactVectorNorm));
+
+                sf::Vector2f deflect(-impactVectorNorm.x * dotImpact2, -impactVectorNorm.y  * dotImpact2);
+                sf::Vector2f deflect2(impactVectorNorm.x * dotImpact1, impactVectorNorm.y  * dotImpact1);
+
+                sf::Vector2f p1Final(player->move_direction.x + deflect.x - deflect2.x, player->move_direction.y + deflect.y - deflect2.y);
+                sf::Vector2f p2Final(player_2->move_direction.x + deflect2.x - deflect.x, player_2->move_direction.y + deflect2.y - deflect.y);
+
+                player->move_direction = p1Final;
+                player_2->move_direction = p2Final;
+
                 if (player->is_dashing) {
                     // @Fix: Duplicated code
                     player_2->dash_start = player_2->position;
                     player_2->is_dashing = true;
-                    player_2->move_direction = player->move_direction;
-                    player_2->dash_time = 0.3;
+                    player_2->dash_time = player->dash_time;
 
-                    player->move_direction = {};
                     player->is_dashing = false;
                 }
+                // @Todo: sort out cases, e.g. both players dashing
                 else if (player_2->is_dashing) {
 
                 }
@@ -218,7 +267,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
 
         // @Hack: true will control the player
         UpdatePlayer(play_state, play_state->players + i, i == 0);
-        if (player->is_dashing) {
+        if (player->is_dashing && !player->perma_dead) {
             player->display.setPosition(player->dash_start);
             player->display.setFillColor(sf::Color::White);
             context->window->draw(player->display);
@@ -236,8 +285,10 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                 player->display.setFillColor(sf::Color::Green);
             }
         }
-        player->display.setPosition(player->position);
-        context->window->draw(player->display);
+        if(!player->perma_dead) {
+            player->display.setPosition(player->position);
+            context->window->draw(player->display);
+        }
     }
 
     // Post update and render increments
