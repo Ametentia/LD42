@@ -29,35 +29,4 @@ inline f32 Tan(f32 rad) {
     return result;
 }
 
-inline f32 Dot(sf::Vector2f a, sf::Vector2f b) {
-    f32 result = a.x * b.x + a.y * b.y;
-    return result;
-}
-
-inline f32 Length(sf::Vector2f v) {
-    f32 result = Sqrt(Dot(v, v));
-    return result;
-}
-
-inline sf::Vector2f Normalise(sf::Vector2f v) {
-    sf::Vector2f result;
-    f32 len = Length(v);
-    if (len != 0) {
-        result.x = v.x / len;
-        result.y = v.y / len;
-    }
-
-    return result;
-}
-
-inline bool CircleCheck(sf::CircleShape a, sf::CircleShape b) {
-    f32 x = a.getPosition().x - b.getPosition().x;
-    f32 y = a.getPosition().y - b.getPosition().y;
-    f32 r = a.getRadius() + b.getRadius();
-    x*=x;
-    y*=y;
-    r*=r;
-    return r > x + y;
-}
-
 #endif  // LUDUM_INTRINSICS_H_

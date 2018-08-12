@@ -11,8 +11,15 @@
 
 #include "Ludum_Platform.h"
 #include "Ludum_Intrinsics.h"
+#include "Ludum_Maths.h"
+
 #include "Ludum_States.h"
 #include "Ludum_Platform.cpp"
+
+internal void SFMLProcessGameButton(Game_Button *current, Game_Button *prev, bool pressed) {
+    current->is_pressed  = pressed;
+    current->transitions = (current->is_pressed != prev->is_pressed) ? 1 : 0;
+}
 
 int main() {
     srand(time(0));
@@ -25,14 +32,40 @@ int main() {
     sf::View viewport(sf::FloatRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
     window.setView(viewport);
 
+    Game_Input input[2] = {};
+
     Game_Context _context = {};
     Game_Context *context = &_context;
-
     context->window = &window;
+
+    Game_Input *current = &input[0];
+    Game_Input *prev    = &input[1];
+
+    {
+        Game_Controller *kbd_current = GetGameController(current, 0);
+        Game_Controller *kbd_prev    = GetGameController(prev, 0);
+
+        kbd_current->is_connected  = true;
+        kbd_current->is_controller = false;
+
+        kbd_prev->is_connected  = true;
+        kbd_prev->is_controller = false;
+    }
 
     PushState(context, CreateStateFromType(StateType_Logo));
 
     while (window.isOpen()) {
+        {
+            Game_Controller *kbd_current = GetGameController(current, 0);
+            Game_Controller *kbd_prev    = GetGameController(prev, 0);
+
+            ResetButtons(kbd_current);
+            for (u32 index = 0; index < ArrayCount(kbd_current->buttons); ++index) {
+                kbd_current->buttons[index].is_pressed =
+                    kbd_prev->buttons[index].is_pressed;
+            }
+        }
+
         sf::Event event;
         while (window.pollEvent(event)) {
             switch (event.type) {
@@ -40,16 +73,108 @@ int main() {
                     window.close();
                 }
                 break;
+                case sf::Event::JoystickConnected: {
+                    u32 id = event.joystickConnect.joystickId;
+                    if (id >= MAX_CONTROLLERS) break;
+
+                    Game_Controller *controller_current = GetGameController(current, id);
+                    Game_Controller *controller_prev    = GetGameController(prev, id);
+
+                    controller_current->is_connected = true;
+                    controller_prev->is_connected    = true;
+                }
+                break;
+                case sf::Event::JoystickDisconnected: {
+                    u32 id = event.joystickConnect.joystickId;
+                    if (id >= MAX_CONTROLLERS) break;
+
+                    Game_Controller *controller_current = GetGameController(current, id);
+                    Game_Controller *controller_prev    = GetGameController(prev, id);
+
+                    ResetButtons(controller_current);
+                    ResetButtons(controller_prev);
+
+                    controller_current->is_connected = false;
+                    controller_prev->is_connected    = false;
+                }
+                break;
                 case sf::Event::KeyPressed: {
-                    if (event.key.code == sf::Keyboard::Escape) window.close();
+                    Game_Controller *kbd_current = GetGameController(current, 0);
+                    Game_Controller *kbd_prev    = GetGameController(current, 0);
+                    switch (event.key.code) {
+                        // Actions
+                        case sf::Keyboard::Space: {
+                            SFMLProcessGameButton(&kbd_current->action_bottom, &kbd_prev->action_bottom, true);
+                        }
+                        break;
+                        case sf::Keyboard::R: {
+                            SFMLProcessGameButton(&kbd_current->action_left, &kbd_prev->action_left, true);
+                        }
+                        break;
+                        case sf::Keyboard::Q: {
+                            SFMLProcessGameButton(&kbd_current->action_top, &kbd_prev->action_top, true);
+                        }
+                        break;
+                        case sf::Keyboard::E: {
+                            SFMLProcessGameButton(&kbd_current->action_right, &kbd_prev->action_right, true);
+                        }
+                        break;
+
+                        // Misc
+                        case sf::Keyboard::Escape: {
+                            SFMLProcessGameButton(&kbd_current->start, &kbd_prev->start, true);
+                        }
+                        break;
+                        case sf::Keyboard::Tab: {
+                            SFMLProcessGameButton(&kbd_current->select, &kbd_prev->select, true);
+                        }
+                        break;
+                    }
+                }
+                break;
+                case sf::Event::KeyReleased: {
+                    Game_Controller *kbd_current = GetGameController(current, 0);
+                    Game_Controller *kbd_prev    = GetGameController(current, 0);
+                    switch (event.key.code) {
+                        // Actions
+                        case sf::Keyboard::Space: {
+                            SFMLProcessGameButton(&kbd_current->action_bottom, &kbd_prev->action_bottom, false);
+                        }
+                        break;
+                        case sf::Keyboard::R: {
+                            SFMLProcessGameButton(&kbd_current->action_left, &kbd_prev->action_left, false);
+                        }
+                        break;
+                        case sf::Keyboard::Q: {
+                            SFMLProcessGameButton(&kbd_current->action_top, &kbd_prev->action_top, false);
+                        }
+                        break;
+                        case sf::Keyboard::E: {
+                            SFMLProcessGameButton(&kbd_current->action_right, &kbd_prev->action_right, false);
+                        }
+                        break;
+
+                        // Misc
+                        case sf::Keyboard::Escape: {
+                            SFMLProcessGameButton(&kbd_current->start, &kbd_prev->start, false);
+                        }
+                        break;
+                        case sf::Keyboard::Tab: {
+                            SFMLProcessGameButton(&kbd_current->select, &kbd_prev->select, false);
+                        }
+                        break;
+                    }
                 }
                 break;
             }
         }
 
         window.clear();
+        context->input = current;
         UpdateRenderGame(context);
         window.display();
+
+        Swap(Game_Input, current, prev);
     }
     return 0;
 }

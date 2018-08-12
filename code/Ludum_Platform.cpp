@@ -16,21 +16,13 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
     result->display.setOutlineColor(sf::Color::White);
     result->display.setOutlineThickness(-2.0);
 
-    Sumo_Circle *old_head =play_state->circle_list_head;
+    Sumo_Circle *old_head =play_state->circle_list;
     result->next = old_head;
     if(old_head) old_head->prev = result;
 
     result->prev = 0;
-    play_state->circle_list_head = result;
+    play_state->circle_list = result;
     play_state->circle_count++;
-}
-
-bool PlayerHitPlayer(Player *a, Player *b) {
-    bool result;
-    sf::Vector2f dist_line = b->position - a->position;
-    f32 radius_sum = a->radius + b->radius;
-    result = Dot(dist_line, dist_line) <= Square(radius_sum);
-    return result;
 }
 
 // Will create a new circle relative to the one given
@@ -98,12 +90,14 @@ void UpdatePlayer(Play_State *play_state, Player *player, bool control) {
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) { player->move_direction.x -= 1; }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) { player->move_direction.x += 1; }
 
+#if 0
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !play_state->was_space) {
                 player->is_dashing = true;
                 player->dash_time = 0.2;
                 player->dash_start = player->position;
                 speed = DASH_SPEED;
             }
+#endif
         }
     }
     else {
@@ -114,41 +108,45 @@ void UpdatePlayer(Play_State *play_state, Player *player, bool control) {
 
     sf::Vector2f velocity = speed * Normalise(player->move_direction);
     player->position += DELTA * velocity;
-
-    play_state->was_space = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
-}
-
-void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
-    logo->rate += logo->delta_rate;
-    logo->opacity = Clamp(logo->opacity + DELTA * 2.5 * logo->rate, -0.1, 255);
-    logo->display.setFillColor(sf::Color(255, 255, 255, logo->opacity));
-    context->window->draw(logo->display);
-
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || logo->opacity <= 0) {
-        State *old_state = SetState(context, CreateStateFromType(StateType_Play));
-        Play_State *play_state = context->current_state->play_state;
-
-        play_state->min_radius = 120;
-        play_state->max_radius = 500;
-        AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
-        CleanupState(old_state);
-    }
-    else if (logo->rate > 75) {
-        logo->delta_rate = -logo->delta_rate;
-    }
 }
 
 void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::F) && !play_state->was_f) {
-        AddPlayer(play_state, RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
-                    VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
-                        - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
+    Game_Input *input = context->input;
+
+    // Update Players based off input
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        Player *player = play_state->players + i;
+        Game_Controller *controller = GetGameController(input, i);
+        if (controller->is_connected) {
+            UpdatePlayer(player, controller);
+            CheckBounds(play_state->circle_list, player);
+        }
     }
 
-    if (play_state->player_count > 0) {
-        UpdatePlayer(play_state->players);
+    // Update any AI entities involved
+    for (u32 i = 0; i < play_state->bot_count; ++i) {
+        Player *bot = play_state->bots + i;
+        UpdateBot(bot);
+        CheckBounds(play_state->circle_list, bot);
     }
 
+    // Check for any collisions
+    CheckCollisions(play_state);
+
+    // Spawn new circles when necessary
+    SpawnSumoCircles(play_state);
+
+    // Render Sumo Circles
+    RenderSumoCircles(play_state->circle_list);
+
+    // Render Dash Trails. Before rendering actual entities so the entities are still on top
+    // when dashing close to entities
+    RenderDashTrails(play_state);
+
+    // Finally, render entities
+    RenderEntities(play_state);
+
+#if 0
     if (play_state->time_since_last_circle >= 4
             || play_state->circle_list_head->radius < play_state->min_radius * 0.6)
     {
@@ -210,7 +208,14 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                     player->is_dashing = false;
                 }
                 else if (player_2->is_dashing) {
+                    // @Fix: Duplicated code
+                    player->dash_start = player_2->position;
+                    player->is_dashing = true;
+                    player->move_direction = player_2->move_direction;
+                    player->dash_time = 0.3;
 
+                    player_2->move_direction = {};
+                    player_2->is_dashing = false;
                 }
             }
 
@@ -243,7 +248,30 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     // Post update and render increments
     play_state->time_since_last_circle += DELTA;
     play_state->was_f = sf::Keyboard::isKeyPressed(sf::Keyboard::F);
+#endif
 }
+
+// @Note: Introduction logo game state
+void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
+    logo->rate += logo->delta_rate;
+    logo->opacity = Clamp(logo->opacity + DELTA * 2.5 * logo->rate, -0.1, 255);
+    logo->display.setFillColor(sf::Color(255, 255, 255, logo->opacity));
+    context->window->draw(logo->display);
+
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || logo->opacity <= 0) {
+        State *old_state = SetState(context, CreateStateFromType(StateType_Play));
+        Play_State *play_state = context->current_state->play_state;
+
+        play_state->min_radius = 120;
+        play_state->max_radius = 500;
+        AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
+        CleanupState(old_state);
+    }
+    else if (logo->rate > 75) {
+        logo->delta_rate = -logo->delta_rate;
+    }
+}
+
 
 void UpdateRenderGame(Game_Context *context) {
     State *current = PeekCurrentState(context);

@@ -33,21 +33,76 @@ do { \
 #define internal static
 #define local static
 
-#define PI32  3.14159265359f
-#define TAU32 6.28318530717958647692f
+#define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
+#define Swap(type, a, b) { type *tmp = a; a = b; b = tmp; }
 
-// @Note: Some simple maths macros
-#define Square(x) ((x) * (x))
-#define Abs(x) ((x) < 0 ? -(x) : (x))
-#define Min(a, b) (a) < (b) ? (a) : (b)
-#define Max(a, b) (a) > (b) ? (a) : (b)
+struct Game_Button {
+    bool is_pressed;
+    u32 transitions;
+};
 
-#define Clamp(x, min, max) Max(min, Min(x, max))
+struct Game_Controller {
+    bool is_connected;
+    bool is_controller;
 
-#define Radians(deg) ((deg) * (PI32 / 180.0f))
-#define Degrees(rad) ((rad) * (180.0f / PI32))
+    union {
+        struct {
+            Game_Button action_top;
+            Game_Button action_bottom;
+            Game_Button action_left;
+            Game_Button action_right;
 
-struct State;
+            Game_Button start;
+            Game_Button select;
+        };
+        Game_Button buttons[6];
+    };
+
+    sf::Vector2f left_stick;
+    sf::Vector2f right_stick;
+};
+
+#define MAX_CONTROLLERS 4
+struct Game_Input {
+    f32 delta_time;
+
+    Game_Controller controllers[MAX_CONTROLLERS];
+
+    sf::Vector2f mouse_position;
+    union {
+        struct {
+            Game_Button mouse_left;
+            Game_Button mouse_right;
+            Game_Button mouse_middle;
+            Game_Button mouse_extra;
+        };
+        Game_Button mouse_buttons[4];
+    };
+};
+
+inline Game_Controller *GetGameController(Game_Input *input, u32 index) {
+    Assert(index < MAX_CONTROLLERS);
+    Game_Controller *result = input->controllers + index;
+    return result;
+}
+
+inline bool IsButtonPressed(Game_Button button) {
+    bool result = button.is_pressed;
+    return result;
+}
+
+inline bool WasButtonPressed(Game_Button button) {
+    bool result = !button.is_pressed && button.transitions > 0;
+    return result;
+}
+
+inline void ResetButtons(Game_Controller *controller) {
+    for (u32 i = 0; i < ArrayCount(controller->buttons); ++i) {
+        Game_Button *button = controller->buttons + i;
+        button->is_pressed = false;
+        button->transitions = 0;
+    }
+}
 
 struct Player {
     u32 score;
@@ -83,17 +138,11 @@ struct Sumo_Circle {
     Sumo_Circle() {}
 };
 
+struct State;
 struct Game_Context {
     sf::RenderWindow *window;
+    Game_Input *input;
     State *current_state;
 };
 
-inline f32 RandomFloat(f32 min, f32 max) {
-    f32 result = 0;
-    f32 rnd = (rand() / cast(f32) RAND_MAX);
-
-    result = (min + (rnd * (max - min)));
-    return result;
-}
-
-#endif  // LUDUM_PLATFORM_H_
+#endif  // LUDUM_PLAFORM_H_
