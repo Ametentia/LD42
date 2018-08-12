@@ -52,6 +52,12 @@ inline bool PlayerHitPlayer(Player *a, Player *b) {
     return result;
 }
 
+inline bool CircleCheck(Sumo_Circle a, Player b) {
+    sf::Vector2f dis(a.position - b.position);
+    f32 radius = a.radius + b.radius;
+    return Dot(dis, dis) <= Square(radius);
+}
+
 inline bool SumoCircleHitPlayer(Sumo_Circle *circle, Player *player) {
     bool result = false;
     sf::Vector2f diff = circle->position - player->position;
@@ -60,6 +66,10 @@ inline bool SumoCircleHitPlayer(Sumo_Circle *circle, Player *player) {
     result = len_sq <= Square(radius_sum);
 
     return result;
+}
+
+inline bool Offscreen(sf::Vector2f a) {
+    return a.x > VIEW_WIDTH || a.x < 0 || a.y > VIEW_HEIGHT || a.y < 0;
 }
 
 #endif  // LUDUM_MATHS_H_
