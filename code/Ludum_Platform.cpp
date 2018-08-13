@@ -1,3 +1,4 @@
+
 // Will create a new circle at the given (x, y) position and the given radius
 void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_delta = RandomFloat(-90, -15)) {
     Sumo_Circle *result = new Sumo_Circle;
