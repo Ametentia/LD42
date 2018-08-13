@@ -112,6 +112,7 @@ struct Play_State {
     Sumo_Circle *circle_list;
     s32 circle_count;
     f32 time_since_last_circle;
+    f32 count_down;
 
     f32 min_radius;
     f32 max_radius;
@@ -125,6 +126,7 @@ struct Play_State {
         circle_count = 0;
         player_count = 0;
         bot_count = 0;
+        count_down = 4;
 
         Assert(player_textures[0].loadFromFile("SumoBall.png"));
         Assert(player_textures[1].loadFromFile("LuchadoreBall.png"));

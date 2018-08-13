@@ -80,20 +80,20 @@ void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
         case PlayerType_LuchadorCat: {
             player->move_speed = 250;
             player->push_strength = 60;
-            player->dash_length = 0.2;
+            player->dash_length = 0.13;
         }
             break;
         case PlayerType_AstroCat: {
             player->move_speed = 450;
             player->push_strength = 10;
-            player->dash_length = 0.4;
+            player->dash_length = 0.15;
         }
             break;
         case PlayerType_DevilCat: {
             // @Todo
             player->move_speed = 350;
             player->push_strength = 20;
-            player->dash_length = 0.2;
+            player->dash_length = 0.13;
         }
             break;
     }
@@ -187,9 +187,10 @@ void DashPlayer(Player *player, f32 dash_time) {
     player->dash_start = player->position;
 }
 
-void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time) {
+void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, Play_State *play_state) {
     f32 speed = player->move_speed;
     bool has_input = player->is_dashing;
+    player->timeLeft -= delta_time;
     if (player->is_dashing) {
         player->dash_time -= delta_time;
         player->is_dashing = player->dash_time > 0;
@@ -212,11 +213,77 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time) {
             if (IsButtonPressed(controller->buttons[3 - control_offset])) { move_direction.x += 1; }
 
         }
+        if(JustButtonPressed(controller->action_top)) {
+            switch(player->type) {
+                case PlayerType_AstroCat:
+                    {
+                        f32 min = 1000000;
+                        sf::Vector2f pos;
+                        s32 index = -1;
+                        for (int i = 0; i < play_state->bot_count; i++) {
+                            f32 len = Length(player->position - (play_state->bots + i)->position);
+                            if ((play_state->bots + i)->alive && len < min) {
+                                pos = (play_state->bots + i)->position;
+                                min = len;
+                                index = i;
+                            }
+                        }
+                        (play_state->bots +index)->position = player->position;
+                        player->position = pos;
+                    }
+                    break;
+                case PlayerType_DevilCat:
+                    {
+                        player->timeLeft = 2.5f;
+                        f32 min = 1000000;
+                        sf::Vector2f pos;
+                        s32 index = -1;
+                        for (int i = 0; i < play_state->bot_count; i++) {
+                            f32 len = Length(player->position - (play_state->bots + i)->position);
+                            if ((play_state->bots + i)->alive && len < min) {
+                                min = len;
+                                index = i;
+                            }
+                        }
+                        (play_state->bots +index)->reversed_controls = true;
+                    }
+                break;
+                case PlayerType_LuchadorCat:
+                    {
+                        player->radius = 40;
+                        player->display.setRadius(40);
+                        player->timeLeft = 5.0f;
+                    }
+                break;
+                case PlayerType_SumoCat:
+                    {
+                        player->timeLeft = 5.0;
+                    }
+                break;
+            }
+        }
         if (JustButtonPressed(controller->action_bottom)) { speed = DASH_SPEED;
-            DashPlayer(player, 0.2);
+            DashPlayer(player, player->dash_length);
         }
         move_direction = Normalise(move_direction);
         player->move_direction = move_direction;
+    }
+    if(player->timeLeft < 0) {
+        switch(player->type) {
+            case PlayerType_LuchadorCat:
+            {
+                player->radius = 20;
+                player->display.setRadius(20);
+            }
+            case PlayerType_DevilCat:
+                for(int i = 0; i < play_state->player_count; i++) {
+                    (play_state->players+i)->reversed_controls = false;
+                }
+                for(int i = 0; i < play_state->bot_count; i++) {
+                    (play_state->bots+i)->reversed_controls = false;
+                }
+            break;
+        }
     }
 
     player->position += speed * delta_time * player->move_direction;
@@ -250,7 +317,7 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
                 for (int i = 0; i < play_state->player_count; i++) {
                     f32 len = Length(bot->position - (play_state->players + i)->position);
                     if ((play_state->players + i)->alive && len < min &&
-                        CheckBounds(play_state->circle_list, (play_state->bots + i)->position)) {
+                        CheckBounds(play_state->circle_list, (play_state->players + i)->position)) {
                         bot->brain.target = (play_state->players + i)->position;
                         min = len;
                         bot->brain.targetNum = i;
@@ -271,6 +338,9 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
                     bot->brain.action = 2;
                 else
                     bot->brain.action = 1;
+                if(bot->reversed_controls) {
+                    bot->brain.action = 1;
+                }
                 break;
             }
             case 1:
@@ -280,6 +350,9 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
                 bot->brain.target.x += RandomFloat(-range, range);
                 bot->brain.target.y += RandomFloat(-range, range);
                 bot->brain.action = 0;
+                if(bot->reversed_controls) {
+                    bot->brain.action = 1;
+                }
                 break;
             }
             case 2:
@@ -303,10 +376,13 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
                     }
                 }
                 bot->brain.action = 1;
+                if(bot->reversed_controls) {
+                    bot->brain.action = 0;
+                }
             }
             break;
         }
-        bot->brain.timer = 0;
+        bot->brain.timer = RandomFloat(-0.6, 0);
     }
 
 
@@ -322,9 +398,16 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
         if(Dot(dist_line, dist_line) > 10) {
             moveDirection = -Normalise(bot->position - bot->brain.target);
         }
+        if(bot->reversed_controls) {
+            moveDirection.x = -moveDirection.x;
+            moveDirection.y = -moveDirection.y;
+            bot->brain.planExecute = 0.15f;
+        }
+        else
+            bot->brain.planExecute = 0.4f;
         bot->move_direction = moveDirection;
         if(bot->brain.wants_dodge) {
-            DashPlayer(bot, 0.2f);
+            DashPlayer(bot, bot->dash_length);
             bot->brain.wants_dodge = false;
         }
     }
@@ -358,9 +441,16 @@ void ResolveCollision(Player *a, Player *b) {
     sf::Vector2f deflect_a = impact_a *  impact;
     sf::Vector2f deflect_b = impact_b * -impact;
 
-    a->move_direction += (deflect_a - deflect_b)*1.3f;
-    b->move_direction += (deflect_b - deflect_a)*1.3f;
-
+    if(a->type == PlayerType_SumoCat && a->timeLeft > 0) {
+        b->move_direction += ((deflect_b - deflect_a) * 2.0f);
+    }
+    else if(b->type == PlayerType_SumoCat && b->timeLeft > 0) {
+        a->move_direction += ((deflect_a - deflect_b) * 2.0f);
+    }
+    else {
+        a->move_direction += (deflect_a - deflect_b) * 1.3f;
+        b->move_direction += (deflect_b - deflect_a) * 1.3f;
+    }
 
 
     if (a->is_dashing && b->is_dashing) {
@@ -369,12 +459,12 @@ void ResolveCollision(Player *a, Player *b) {
     }
     else if (a->is_dashing) {
         f32 push_factor = a->dash_time;
-        a->is_dashing = false;
+        a->is_dashing = b->type == PlayerType_SumoCat && b->timeLeft > 0;
         DashPlayer(b, push_factor);
     }
     else if (b->is_dashing) {
         f32 push_factor = b->dash_time;
-        b->is_dashing = false;
+        b->is_dashing = a->type == PlayerType_SumoCat && a->timeLeft > 0;
         DashPlayer(a, push_factor);
     }
 
@@ -484,17 +574,37 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
 #if 0
     {
         Game_Controller *controller = GetGameController(input, 0);
-        if (JustButtonPressed(controller->action_top)) {
-            AddPlayer(play_state, cast(Player_Type) RandomInt(0, 4),
+        if (JustButtonPressed(controller->action_right)) {
+            AddPlayer(play_state, PlayerType_LuchadorCat,
                     RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
                         VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
                             - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
         }
-        if (JustButtonPressed(controller->action_top)) {
-            AddBot(play_state, PlayerType_DevilCat,
-                      RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
-                                  VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
-                                                                                          - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
+        if (JustButtonPressed(controller->action_right)) {
+            AddBot(play_state, PlayerType_SumoCat,
+                   RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
+                               VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
+                                                                                       - play_state->min_radius,
+                                                                                       VIEW_HEIGHT / 2.0 +
+                                                                                       play_state->min_radius));
+            AddBot(play_state, PlayerType_SumoCat,
+                   RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
+                               VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
+                                                                                       - play_state->min_radius,
+                                                                                       VIEW_HEIGHT / 2.0 +
+                                                                                       play_state->min_radius));
+            AddBot(play_state, PlayerType_SumoCat,
+                   RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
+                               VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
+                                                                                       - play_state->min_radius,
+                                                                                       VIEW_HEIGHT / 2.0 +
+                                                                                       play_state->min_radius));
+            AddBot(play_state, PlayerType_SumoCat,
+                   RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
+                               VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
+                                                                                       - play_state->min_radius,
+                                                                                       VIEW_HEIGHT / 2.0 +
+                                                                                       play_state->min_radius));
         }
 
         if (JustButtonPressed(controller->select)) {
@@ -515,7 +625,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         Player *player = play_state->players + i;
         Game_Controller *controller = GetGameController(input, i);
         if (player->alive) {
-            UpdatePlayer(player, controller, input->delta_time);
+            UpdatePlayer(player, controller, input->delta_time, play_state);
             CheckBounds(play_state->circle_list, player);
         }
     }

@@ -137,7 +137,7 @@ struct BotBrain {
     f32 wants_dodge;
     u8 action;
 
-    u8 targetNum;
+    f32 targetNum;
 
     BotBrain() {
         targetNum = 0;
@@ -145,7 +145,7 @@ struct BotBrain {
         timer = 100000;
         reactionTime = 0.4f;
         planExecute = 0.4;
-        f32 wants_dodge = -1;
+        wants_dodge = -1;
     };
 };
 
@@ -164,6 +164,8 @@ struct Player {
     f32 move_speed;
     f32 push_strength;
     f32 dash_length;
+    //@Note: power variables
+    f32 timeLeft;
 
     // The players radius may change because of special moves
     f32 radius;
@@ -183,6 +185,7 @@ struct Player {
     Player() {
         score = 0;
         score_time = 0;
+        timeLeft = 0;
         push_strength = 0.2f;
         is_dashing = false;
         dash_time = 0;
