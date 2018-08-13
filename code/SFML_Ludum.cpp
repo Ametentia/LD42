@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 // @Note: Configuration
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
@@ -9,9 +10,8 @@
 #define DELTA (1.0f / 60.0f)
 
 #include "Ludum_Platform.h"
-#include "Ludum_Intrinsics.h"
-
-#include "Ludum_States.h"
+#include "Ludum_Platform.cpp"
+#include "Ludum_Maths.h"
 
 internal void SFMLProcessGameButton(Game_Button *current, Game_Button *prev, bool pressed) {
     current->is_pressed  = pressed;
