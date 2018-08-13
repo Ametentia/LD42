@@ -286,6 +286,8 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, P
         }
     }
 
+    player->timeLeft -= delta_time;
+
     player->position += speed * delta_time * player->move_direction;
     if (!has_input) { player->move_direction = {}; }
 
@@ -671,6 +673,34 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         context->window->draw(text);
     }
 
+
+    bool game_over = play_state->bots[0].alive;
+    for (u32 i = 1; i < play_state->bot_count; ++i) {
+        game_over &= !play_state->bots[i].alive;
+    }
+
+    game_over = game_over | !play_state->players[0].alive;
+
+    if (game_over) {
+        State *old_state = SetState(context, CreateStateFromType(StateType_GameOver));
+        Game_Over_State *state = context->current_state->game_over_state;
+
+        state->won = play_state->players[0].alive;
+        if (state->won) {
+            state->winner = play_state->players[0].type;
+        }
+        else {
+            state->winner = play_state->bots[RandomInt(0, play_state->bot_count)].type;
+        }
+        state->scores[0] = { play_state->players[0].score, play_state->players[0].type };
+        for (u32 i = 0; i < play_state->bot_count; ++i) {
+            state->scores[i + 1] = { play_state->bots[i].score, play_state->bots[i].type };
+        }
+
+        CleanupState(old_state);
+        return;
+    }
+
     // @Todo: Spawn Sumo circles
     if (play_state->time_since_last_circle >= 4
         || play_state->circle_list->shrink_delta > 50)
@@ -740,6 +770,49 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     // Finally, render entities
     RenderEntities(context, play_state);
 
+    for (u32 i = 0; i < play_state->player_count; ++i) {
+        Player *player = play_state->players + i;
+        if (player->timeLeft <= 0) {
+            // @Todo
+            play_state->charge_bars[i].setTexture(play_state->ui_elements + player->type + 4);
+        }
+        else {
+            play_state->charge_bars[i].setTexture(play_state->ui_elements + player->type);
+            f32 width = (1.0 - (player->timeLeft / 20)) * (VIEW_WIDTH / 4.0);
+            sf::RectangleShape shape;
+            shape.setSize(sf::Vector2f(width, 100));
+            shape.setPosition(20 + i * (VIEW_WIDTH / 4.0), VIEW_HEIGHT - 100);
+            shape.setFillColor(sf::Color(255, 102, 0));
+
+            context->window->draw(shape);
+
+        }
+
+        context->window->draw(play_state->charge_bars[i]);
+    }
+
+    f32 offset = (play_state->player_count * (VIEW_WIDTH / 4.0));
+    for (u32 i = 0; i < play_state->bot_count; ++i) {
+        Player *bot = play_state->bots + i;
+        if (bot->timeLeft <= 0) {
+            // @Todo
+            play_state->charge_bars[i + play_state->player_count].setTexture(play_state->ui_elements + bot->type + 4);
+        }
+        else {
+            play_state->charge_bars[i + play_state->player_count].setTexture(play_state->ui_elements + bot->type);
+            f32 width = (1.0 - (bot->timeLeft / 20)) * (VIEW_WIDTH / 4.0);
+            sf::RectangleShape shape;
+            shape.setSize(sf::Vector2f(width, 100));
+            shape.setPosition(20 + offset + i * (VIEW_WIDTH / 4.0), VIEW_HEIGHT - 100);
+            shape.setFillColor(sf::Color(255, 102, 0));
+
+            context->window->draw(shape);
+
+        }
+
+        context->window->draw(play_state->charge_bars[i + play_state->player_count]);
+    }
+
     // Post update and render increments
     play_state->time_since_last_circle += input->delta_time;
 #endif
@@ -766,14 +839,14 @@ void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
 
 void UpdateRenderCharacterSelect(Game_Context *context, Character_Select_State *character_select) {
     Game_Controller *controller = GetGameController(context->input, 0);
-    if (JustButtonPressed(controller->move_left)) {
+    if (!character_select->ready && JustButtonPressed(controller->move_left)) {
         character_select->index = character_select->index - 1 < 0 ? 3 : character_select->index - 1;
     }
-    else if (JustButtonPressed(controller->move_right)) {
+    else if (!character_select->ready && JustButtonPressed(controller->move_right)) {
         character_select->index = character_select->index + 1 >= 4 ? 0 : character_select->index + 1;
     }
 
-    if (JustButtonPressed(controller->action_bottom)) {
+    if (JustButtonPressed(controller->action_bottom) && character_select->ready) {
         Player_Type player_type = cast(Player_Type) character_select->index;
 
         State *old_state = SetState(context, CreateStateFromType(StateType_Play));
@@ -804,6 +877,12 @@ void UpdateRenderCharacterSelect(Game_Context *context, Character_Select_State *
         CleanupState(old_state);
         return;
     }
+    else if (JustButtonPressed(controller->action_bottom)) {
+        character_select->ready = true;
+    }
+    else if (JustButtonPressed(controller->start)) {
+        character_select->ready = false;
+    }
 
     f32 sin = Sin(character_select->scale_offset);
     f32 cos = Cos(character_select->scale_offset);
@@ -827,7 +906,15 @@ void UpdateRenderCharacterSelect(Game_Context *context, Character_Select_State *
         character_select->character_shapes[i].setTexture(character_select->characters_gray + i);
         context->window->draw(character_select->character_shapes[i]);
     }
-    context->window->draw(character_select->border_shape);
+
+    if (character_select->ready) {
+        character_select->border_shape.setTexture(&character_select->ready_texture);
+        context->window->draw(character_select->border_shape);
+    }
+    else {
+        character_select->border_shape.setTexture(&character_select->border);
+        context->window->draw(character_select->border_shape);
+    }
 
     character_select->scale_offset += 1.8 * context->input->delta_time;
 }
@@ -838,9 +925,7 @@ void UpdateRenderMenuState(Game_Context *context, Menu_State *menu_state) {
     for (u32 i = 0; i < ArrayCount(controller->buttons); ++i) {
         if (JustButtonPressed(controller->buttons[i])) {
             State *old_state = SetState(context, CreateStateFromType(StateType_CharacterSelect));
-#if 0
-            Play_State *play_state = context->current_state->play_state;
-#endif
+            CleanupState(old_state);
             return;
         }
     }
@@ -857,6 +942,96 @@ void UpdateRenderMenuState(Game_Context *context, Menu_State *menu_state) {
 
 
     menu_state->text_time += input->delta_time;
+}
+
+void UpdateRenderGameOver(Game_Context *context, Game_Over_State *game_over) {
+
+    Game_Controller *controller = GetGameController(context->input, 0);
+    if (JustButtonPressed(controller->action_bottom)) {
+        Player_Type player_type = game_over->scores[0].type;
+
+        State *old_state = SetState(context, CreateStateFromType(StateType_Play));
+        Play_State *play_state = context->current_state->play_state;
+
+        play_state->min_radius = 320;
+        play_state->max_radius = 500;
+        AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
+
+        sf::Vector2f half_sceen = { VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0 };
+        sf::Vector2f positions[4] = {
+            { half_sceen.x - play_state->min_radius, half_sceen.y - play_state->min_radius },
+            { half_sceen.x + play_state->min_radius, half_sceen.y - play_state->min_radius },
+            { half_sceen.x + play_state->min_radius, half_sceen.y + play_state->min_radius },
+            { half_sceen.x - play_state->min_radius, half_sceen.y + play_state->min_radius }
+        };
+
+        sf::Vector2f position = positions[player_type];
+        AddPlayer(play_state, player_type, position.x, position.y);
+        for (u32 i = 0; i < 4; ++i) {
+            Player_Type type = cast(Player_Type) i;
+            if (type == player_type) continue;
+
+            position = positions[i];
+            AddBot(play_state, type, position.x, position.y);
+        }
+
+        CleanupState(old_state);
+        return;
+    }
+    else if (JustButtonPressed(controller->action_left)) {
+        State *old_state = SetState(context, CreateStateFromType(StateType_CharacterSelect));
+        CleanupState(old_state);
+        return;
+    }
+
+    if (game_over->won) {
+        Score *score = game_over->scores;
+        sf::Text text;
+        text.setFont(game_over->display_font);
+        char buf[256];
+        snprintf(buf, 256, "You Won!\nScore: %d", score->score);
+        text.setCharacterSize(140);
+        text.setPosition(80, VIEW_HEIGHT / 4);
+        text.setString(buf);
+        text.setFillColor(sf::Color::Green);
+
+        context->window->draw(text);
+    }
+    else {
+        Score *score = game_over->scores;
+        sf::Text text;
+        text.setFont(game_over->display_font);
+        char buf[256];
+        snprintf(buf, 256, "You Lost!\nScore: %d", score->score);
+        text.setString(buf);
+        text.setFillColor(sf::Color::Red);
+        text.setCharacterSize(140);
+        text.setPosition(80, VIEW_HEIGHT / 4);
+
+        context->window->draw(text);
+    }
+
+    sf::Texture *texture = game_over->char_display + game_over->winner;
+
+    sf::RectangleShape shape;
+    shape.setPosition(VIEW_WIDTH - texture->getSize().x / 2, VIEW_HEIGHT - texture->getSize().y / 2);
+    shape.setSize(sf::Vector2f(texture->getSize().x / 2, texture->getSize().y / 2));
+    shape.setTexture(texture);
+
+    context->window->draw(shape);
+
+    sf::Text text;
+    text.setFont(game_over->display_font);
+    text.setString("Press 'Space' to restart");
+    text.setPosition(80, VIEW_HEIGHT - 300);
+    text.setCharacterSize(60);
+    text.setFillColor(sf::Color::Black);
+
+    context->window->draw(text);
+
+    text.setString("Press 'R' to go back to the\ncharacter select screen");
+    text.setPosition(80, VIEW_HEIGHT - 160);
+    context->window->draw(text);
 }
 
 void UpdateRenderGame(Game_Context *context) {
@@ -880,7 +1055,7 @@ void UpdateRenderGame(Game_Context *context) {
         }
         break;
         case StateType_GameOver: {
-            // @Todo
+            UpdateRenderGameOver(context, current->game_over_state);
         }
         break;
     }

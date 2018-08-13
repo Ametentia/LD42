@@ -12,7 +12,7 @@ echo "Compiling with \"$COMPILER\"..."
 MainSource="SFML_${PROJECT}.cpp"
 
 # Compilation Options
-CompilerFlags="--driver-mode=cl -Zi -Wno-switch -I ../libs/SFML/Win64/include"
+CompilerFlags="--driver-mode=cl -Od -Zi -Wno-switch -I ../libs/SFML/Win64/include"
 Defines="-D${PROJECT^^}_INTERNAL -D${PROJECT^^}_SLOW -D${PROJECT^^}_WINDOWS"
 LinkerFlags="/LIBPATH:../libs/SFML/Win64/lib sfml-graphics.lib sfml-window.lib sfml-system.lib kernel32.lib"
 

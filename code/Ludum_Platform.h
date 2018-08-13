@@ -185,7 +185,7 @@ struct Player {
     Player() {
         score = 0;
         score_time = 0;
-        timeLeft = 0;
+        timeLeft = 20;
         push_strength = 0.2f;
         is_dashing = false;
         dash_time = 0;
@@ -221,6 +221,11 @@ struct Sumo_Circle {
     Sumo_Circle() {
         pattern = Random;
     }
+};
+
+struct Score {
+    u32 score;
+    Player_Type type;
 };
 
 struct State;

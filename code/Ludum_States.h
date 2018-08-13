@@ -41,7 +41,7 @@ struct Menu_State {
 
     Menu_State() {
         Assert(background.loadFromFile("StartScreen.png"));
-        Assert(start.loadFromFile("start.png"));
+        Assert(start.loadFromFile("StartGame.png"));
 
         text_time = 0;
         show_text = true;
@@ -50,9 +50,12 @@ struct Menu_State {
         background_shape.setTexture(&background);
 
         sf::Vector2f size(start.getSize());
+        f32 ratio = size.x / 1920;
+        size.x = 1920;
+        size.y = (size.y / ratio);
         start_shape.setSize(size);
         start_shape.setTexture(&start);
-        start_shape.setPosition(VIEW_WIDTH / 2.0 - (size.x / 2.0) + 90,
+        start_shape.setPosition(VIEW_WIDTH / 2.0 - (size.x / 2.0) + 45,
                 VIEW_HEIGHT - (size.y) - 60);
     }
 };
@@ -62,11 +65,14 @@ struct Character_Select_State {
     sf::Texture characters_gray[4];
     sf::RectangleShape character_shapes[4];
 
+    sf::Texture ready_texture;
     sf::Texture border;
     sf::RectangleShape border_shape;
 
     s32 index;
     f32 scale_offset;
+
+    bool ready;
 
     Character_Select_State() {
         Assert(characters[0].loadFromFile("SumoSelected.png"));
@@ -86,11 +92,13 @@ struct Character_Select_State {
             shape->setTexture(characters + i);
         }
 
+        Assert(ready_texture.loadFromFile("CSSOverlaySelected.png"));
         Assert(border.loadFromFile("CSSOverlay.png"));
         border_shape.setPosition(0, 0);
         border_shape.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
         border_shape.setTexture(&border);
 
+        ready = false;
         index = 0;
         scale_offset = 0;
     }
@@ -101,6 +109,10 @@ struct Character_Select_State {
 
 struct Play_State {
     sf::Texture player_textures[4];
+
+    // @Note: For supers
+    sf::Texture ui_elements[8];
+    sf::RectangleShape charge_bars[4];
 
     sf::Font display_font;
     Player players[MAX_PLAYERS];
@@ -133,10 +145,46 @@ struct Play_State {
         Assert(player_textures[2].loadFromFile("AstroBall.png"));
         Assert(player_textures[3].loadFromFile("DevilBall.png"));
 
+        Assert(ui_elements[0].loadFromFile("SumoBarEmpty.png"));
+        Assert(ui_elements[1].loadFromFile("LuchadoreBarEmpty.png"));
+        Assert(ui_elements[2].loadFromFile("AstroBarEmpty.png"));
+        Assert(ui_elements[3].loadFromFile("DevilBarEmpty.png"));
+
+        Assert(ui_elements[4].loadFromFile("SumoBarFull.png"));
+        Assert(ui_elements[5].loadFromFile("LuchadoreBarFull.png"));
+        Assert(ui_elements[6].loadFromFile("AstroBarFull.png"));
+        Assert(ui_elements[7].loadFromFile("DevilBarFull.png"));
+
+        sf::Vector2f size = sf::Vector2f(ui_elements[0].getSize());
+        f32 ratio = size.y / size.x;
+        for (u32 i = 0; i < 4; ++i) {
+            f32 width = (VIEW_WIDTH / 4.0);
+            charge_bars[i].setSize(sf::Vector2f(width, width * ratio));
+            charge_bars[i].setPosition(i * (VIEW_WIDTH / 4.0), VIEW_HEIGHT - (width * ratio));
+            charge_bars[i].setTexture(ui_elements + i);
+        }
+
         Assert(display_font.loadFromFile("Ubuntu.ttf"));
     }
 };
 
+struct Game_Over_State {
+    bool won;
+    Player_Type winner;
+    Score scores[4];
+
+    sf::Font display_font;
+    sf::Texture char_display[4];
+
+    Game_Over_State() {
+        Assert(display_font.loadFromFile("Ubuntu.ttf"));
+
+        Assert(char_display[0].loadFromFile("SumoCat.png"));
+        Assert(char_display[1].loadFromFile("LuchadoreCat.png"));
+        Assert(char_display[2].loadFromFile("AstroCat.png"));
+        Assert(char_display[3].loadFromFile("DevilCat.png"));
+    }
+};
 
 struct State {
    State_Type type;
@@ -145,7 +193,7 @@ struct State {
        Play_State *play_state;
        Menu_State *menu_state;
        Character_Select_State *character_state;
-       // @Todo: Game_Over_State *game_over_state;
+       Game_Over_State *game_over_state;
        // etc....
    };
 
@@ -211,7 +259,11 @@ inline State* CreateStateFromType(State_Type type) {
             result->character_state = new Character_Select_State;
         }
         break;
-        case StateType_GameOver: { Assert(false); } break; // @Todo
+        case StateType_GameOver: {
+            result->type = StateType_GameOver;
+            result->game_over_state = new Game_Over_State;
+        }
+        break;
     }
 
     result->next = 0;
@@ -223,7 +275,8 @@ inline void CleanupState(State *state) {
         case StateType_Logo: { delete state->logo_state; } break;
         case StateType_Play: { delete state->play_state; } break;
         case StateType_MainMenu: { delete state->menu_state; } break;
-        case StateType_GameOver: { Assert(false); } break; // @Todo
+        case StateType_CharacterSelect: { delete state->character_state; } break;
+        case StateType_GameOver: { delete state->game_over_state; } break;
     }
 
     delete state;
