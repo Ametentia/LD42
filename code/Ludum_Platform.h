@@ -61,7 +61,7 @@ struct Game_Controller {
             Game_Button start;
             Game_Button select;
         };
-        Game_Button buttons[6];
+        Game_Button buttons[10];
     };
 
     sf::Vector2f left_stick;
@@ -180,7 +180,6 @@ struct Player {
     sf::Texture texture;
 
     BotBrain brain;
-
     Player() {
         score = 0;
         score_time = 0;
@@ -198,18 +197,6 @@ struct Player {
         is_bot = false;
     }
 };
-
-#if 0
-struct Circle_Spawn {
-    sf::Vector2f centre;
-    f32 radius;
-    u8 count;
-    u8 max;
-
-    Circle_Spawn() {}
-};
-Circle_Spawn circle_spawn;
-#endif
 
 struct Sumo_Circle {
     enum Pattern { Circle, Random };

@@ -23,6 +23,6 @@ fi
 
 pushd ../build > /dev/null
 
-$COMPILER $CompilerFlags $Defines ../code/$MainSource /link $LinkerFlags 2>&1 | grep "error\|warning\|undefined" | compile
+$COMPILER $CompilerFlags $Defines ../code/$MainSource /link $LinkerFlags # 2>&1 | grep "error\|warning\|undefined" | compile
 
 popd > /dev/null

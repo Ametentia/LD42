@@ -62,38 +62,34 @@ void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
     if (play_state->bot_count >= MAX_BOTS) return;
     Player *player = play_state->bots + play_state->bot_count++;
 
+    player->alive = true;
     player->type = type;
     player->position = { x, y };
     player->radius = 20;
     player->display.setRadius(20);
     player->brain.action = RandomInt(0,1);
 
+    player->display.setTexture(play_state->player_textures + type);
     switch (player->type) {
         case PlayerType_SumoCat: {
-            player->display.setFillColor(sf::Color::White);
             player->push_strength = 100;
             player->move_speed = 250;
             player->dash_length = 0.1;
         }
             break;
         case PlayerType_LuchadorCat: {
-            player->display.setFillColor(sf::Color(24, 213, 75));
             player->move_speed = 250;
             player->push_strength = 60;
             player->dash_length = 0.2;
         }
             break;
         case PlayerType_AstroCat: {
-            player->display.setFillColor(sf::Color(113, 229, 255));
-
             player->move_speed = 450;
             player->push_strength = 10;
             player->dash_length = 0.4;
         }
             break;
         case PlayerType_DevilCat: {
-            player->display.setFillColor(sf::Color::Red);
-
             // @Todo
             player->move_speed = 350;
             player->push_strength = 20;
@@ -144,36 +140,33 @@ void AddPlayer(Play_State *play_state, Player_Type type, f32 x, f32 y) {
     if (play_state->player_count >= MAX_PLAYERS) return;
     Player *player = play_state->players + play_state->player_count++;
 
+    player->alive = true;
     player->type = type;
     player->position = { x, y };
     player->radius = 20;
     player->display.setRadius(20);
 
+    player->display.setTexture(play_state->player_textures + type);
     switch (player->type) {
         case PlayerType_SumoCat: {
-            player->display.setFillColor(sf::Color::White);
             player->push_strength = 100;
             player->move_speed = 250;
             player->dash_length = 0.1;
         }
         break;
         case PlayerType_LuchadorCat: {
-            player->display.setFillColor(sf::Color(24, 213, 75));
             player->move_speed = 250;
             player->push_strength = 60;
             player->dash_length = 0.2;
         }
         break;
         case PlayerType_AstroCat: {
-            player->display.setFillColor(sf::Color(113, 229, 255));
-
             player->move_speed = 450;
             player->push_strength = 10;
             player->dash_length = 0.4;
         }
         break;
         case PlayerType_DevilCat: {
-            player->display.setFillColor(sf::Color::Red);
 
             // @Todo
             player->move_speed = 350;
@@ -254,7 +247,6 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
             case 0:
             {
                 f32 min = 1000000;
-                bot->brain.targetNum = -1;
                 for (int i = 0; i < play_state->player_count; i++) {
                     f32 len = Length(bot->position - (play_state->players + i)->position);
                     if ((play_state->players + i)->alive && len < min &&
@@ -489,6 +481,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     Game_Input *input = context->input;
 
     // @Debug: Adding Players and quit on escape
+#if 0
     {
         Game_Controller *controller = GetGameController(input, 0);
         if (JustButtonPressed(controller->action_top)) {
@@ -511,6 +504,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
 
         if (IsButtonPressed(controller->start)) input->requested_quit = true;
     }
+#endif
 
 
     // Check for any collisions
@@ -581,10 +575,6 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         }
     }
 
-
-
-
-
     play_state->circle_list->display.setOutlineColor(sf::Color::White);
     if (play_state->circle_list->next)
         play_state->circle_list->next->display.setOutlineColor(sf::Color::White);
@@ -595,7 +585,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         if (!player->alive) continue;
 
         if (player->is_dashing) {
-            sf::Color norm = player->display.getFillColor();
+            sf::Color norm = sf::Color::White;
             player->display.setPosition(player->dash_start);
             player->display.setFillColor(sf::Color::White);
             context->window->draw(player->display);
@@ -664,18 +654,83 @@ void UpdateRenderLogoState(Game_Context *context, Logo_State *logo) {
     }
 }
 
+void UpdateRenderCharacterSelect(Game_Context *context, Character_Select_State *character_select) {
+    Game_Controller *controller = GetGameController(context->input, 0);
+    if (JustButtonPressed(controller->move_left)) {
+        character_select->index = character_select->index - 1 < 0 ? 3 : character_select->index - 1;
+    }
+    else if (JustButtonPressed(controller->move_right)) {
+        character_select->index = character_select->index + 1 >= 4 ? 0 : character_select->index + 1;
+    }
+
+    if (JustButtonPressed(controller->action_bottom)) {
+        Player_Type player_type = cast(Player_Type) character_select->index;
+
+        State *old_state = SetState(context, CreateStateFromType(StateType_Play));
+        Play_State *play_state = context->current_state->play_state;
+
+        play_state->min_radius = 320;
+        play_state->max_radius = 500;
+        AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
+
+        sf::Vector2f half_sceen = { VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0 };
+        sf::Vector2f positions[4] = {
+            { half_sceen.x - play_state->min_radius, half_sceen.y - play_state->min_radius },
+            { half_sceen.x + play_state->min_radius, half_sceen.y - play_state->min_radius },
+            { half_sceen.x + play_state->min_radius, half_sceen.y + play_state->min_radius },
+            { half_sceen.x - play_state->min_radius, half_sceen.y + play_state->min_radius }
+        };
+
+        sf::Vector2f position = positions[player_type];
+        AddPlayer(play_state, player_type, position.x, position.y);
+        for (u32 i = 0; i < 4; ++i) {
+            Player_Type type = cast(Player_Type) i;
+            if (type == player_type) continue;
+
+            position = positions[i];
+            AddBot(play_state, type, position.x, position.y);
+        }
+
+        CleanupState(old_state);
+        return;
+    }
+
+    f32 sin = Sin(character_select->scale_offset);
+    f32 cos = Cos(character_select->scale_offset);
+
+    s32 index = character_select->index;
+    sf::RectangleShape *shape = character_select->character_shapes + index;
+
+    shape->setTexture(character_select->characters + index);
+
+    sf::Vector2f position = shape->getPosition();
+    sf::Vector2f size = shape->getSize();
+
+    //shape->setPosition(position.x + (sin / 2.0), position.y + (sin / 2.0));
+    //shape->setSize(sf::Vector2f(size.x - sin, size.y - sin));
+    context->window->draw(character_select->character_shapes[index]);
+
+    for (u32 i = 0; i < 4; ++i) {
+        if (i == character_select->index) continue;
+        //character_select->character_shapes[i].setSize(sf::Vector2f(VIEW_WIDTH / 4.0, 0.6 * VIEW_HEIGHT));
+        //character_select->character_shapes[i].setPosition(i * (VIEW_WIDTH / 4.0), 40);
+        character_select->character_shapes[i].setTexture(character_select->characters_gray + i);
+        context->window->draw(character_select->character_shapes[i]);
+    }
+    context->window->draw(character_select->border_shape);
+
+    character_select->scale_offset += 1.8 * context->input->delta_time;
+}
+
 void UpdateRenderMenuState(Game_Context *context, Menu_State *menu_state) {
     Game_Input *input = context->input;
     Game_Controller *controller = GetGameController(input, 0);
     for (u32 i = 0; i < ArrayCount(controller->buttons); ++i) {
         if (JustButtonPressed(controller->buttons[i])) {
-            State *old_state = SetState(context, CreateStateFromType(StateType_Play));
+            State *old_state = SetState(context, CreateStateFromType(StateType_CharacterSelect));
+#if 0
             Play_State *play_state = context->current_state->play_state;
-
-            play_state->min_radius = 320;
-            play_state->max_radius = 500;
-            AddSumoCircle(play_state, VIEW_WIDTH / 2.0, VIEW_HEIGHT / 2.0, play_state->max_radius);
-            CleanupState(old_state);
+#endif
             return;
         }
     }
@@ -687,15 +742,7 @@ void UpdateRenderMenuState(Game_Context *context, Menu_State *menu_state) {
     }
 
     if (menu_state->show_text) {
-        sf::Text text;
-        text.setFont(menu_state->display_font);
-        text.setCharacterSize(60);
-        text.setFillColor(sf::Color(255, 25, 25));
-        text.setString("Start Game!");
-        text.setStyle(sf::Text::Bold | sf::Text::Underlined);
-        text.setPosition(790, 850);
-
-        context->window->draw(text);
+        context->window->draw(menu_state->start_shape);
     }
 
 
@@ -716,6 +763,10 @@ void UpdateRenderGame(Game_Context *context) {
         break;
         case StateType_Play: {
             UpdateRenderPlayState(context, current->play_state);
+        }
+        break;
+        case StateType_CharacterSelect: {
+            UpdateRenderCharacterSelect(context, current->character_state);
         }
         break;
         case StateType_GameOver: {

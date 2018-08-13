@@ -33,31 +33,75 @@ struct Menu_State {
     sf::Texture background;
     sf::RectangleShape background_shape;
 
-    sf::Font display_font;
+    sf::Texture start;
+    sf::RectangleShape start_shape;
 
     f32 text_time;
     bool show_text;
 
     Menu_State() {
         Assert(background.loadFromFile("StartScreen.png"));
-        Assert(display_font.loadFromFile("Ubuntu.ttf"));
+        Assert(start.loadFromFile("start.png"));
 
         text_time = 0;
         show_text = true;
         background_shape.setPosition(0, 0);
-        background_shape.setSize(sf::Vector2f(1920, 1080));
+        background_shape.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
         background_shape.setTexture(&background);
+
+        sf::Vector2f size(start.getSize());
+        start_shape.setSize(size);
+        start_shape.setTexture(&start);
+        start_shape.setPosition(VIEW_WIDTH / 2.0 - (size.x / 2.0) + 90,
+                VIEW_HEIGHT - (size.y) - 60);
     }
 };
 
 struct Character_Select_State {
-    // @Todo
+    sf::Texture characters[4];
+    sf::Texture characters_gray[4];
+    sf::RectangleShape character_shapes[4];
+
+    sf::Texture border;
+    sf::RectangleShape border_shape;
+
+    s32 index;
+    f32 scale_offset;
+
+    Character_Select_State() {
+        Assert(characters[0].loadFromFile("SumoSelected.png"));
+        Assert(characters[1].loadFromFile("LuchadoreSelected.png"));
+        Assert(characters[2].loadFromFile("AstroSelected.png"));
+        Assert(characters[3].loadFromFile("DevilSelected.png"));
+
+        Assert(characters_gray[0].loadFromFile("SumoUnselected.png"));
+        Assert(characters_gray[1].loadFromFile("LuchadoreUnselected.png"));
+        Assert(characters_gray[2].loadFromFile("AstroUnselected.png"));
+        Assert(characters_gray[3].loadFromFile("DevilUnselected.png"));
+
+        for (u32 i = 0; i < 4; ++i) {
+            sf::RectangleShape *shape = character_shapes + i;
+            shape->setPosition(i * (VIEW_WIDTH / 4.0), 0);
+            shape->setSize(sf::Vector2f(characters[i].getSize().x,  VIEW_HEIGHT));
+            shape->setTexture(characters + i);
+        }
+
+        Assert(border.loadFromFile("CSSOverlay.png"));
+        border_shape.setPosition(0, 0);
+        border_shape.setSize(sf::Vector2f(VIEW_WIDTH, VIEW_HEIGHT));
+        border_shape.setTexture(&border);
+
+        index = 0;
+        scale_offset = 0;
+    }
 };
 
 #define MAX_PLAYERS 4
 #define MAX_BOTS 8
 
 struct Play_State {
+    sf::Texture player_textures[4];
+
     sf::Font display_font;
     Player players[MAX_PLAYERS];
     s32 player_count;
@@ -81,6 +125,11 @@ struct Play_State {
         circle_count = 0;
         player_count = 0;
         bot_count = 0;
+
+        Assert(player_textures[0].loadFromFile("SumoBall.png"));
+        Assert(player_textures[1].loadFromFile("LuchadoreBall.png"));
+        Assert(player_textures[2].loadFromFile("AstroBall.png"));
+        Assert(player_textures[3].loadFromFile("DevilBall.png"));
 
         Assert(display_font.loadFromFile("Ubuntu.ttf"));
     }
