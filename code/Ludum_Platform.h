@@ -129,6 +129,26 @@ enum Player_Type {
     PlayerType_Count
 };
 
+struct BotBrain {
+    f32 timer;
+    sf::Vector2f target;
+    f32 reactionTime;
+    f32 planExecute;
+    f32 wants_dodge;
+    u8 action;
+
+    u8 targetNum;
+
+    BotBrain() {
+        targetNum = 0;
+        action = 1;
+        timer = 100000;
+        reactionTime = 0.4f;
+        planExecute = 0.4;
+        f32 wants_dodge = -1;
+    };
+};
+
 struct Player {
     Player_Type type;
 
@@ -157,6 +177,9 @@ struct Player {
     sf::Vector2f dash_start;
 
     sf::CircleShape display;
+    sf::Texture texture;
+
+    BotBrain brain;
 
     Player() {
         score = 0;
@@ -164,8 +187,10 @@ struct Player {
         push_strength = 0.2f;
         is_dashing = false;
         dash_time = 0;
+        move_direction = sf::Vector2f(0,0);
 
         radius = 25;
+        type = Player_Type::PlayerType_AstroCat;
 
         alive = true;
 
@@ -199,6 +224,9 @@ struct Sumo_Circle {
 
     Sumo_Circle *next;
     Sumo_Circle *prev;
+
+    u8 pattern_count;
+    u8 pattern_max;
 
     Sumo_Circle() {
         pattern = Random;

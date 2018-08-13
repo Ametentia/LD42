@@ -1,7 +1,6 @@
 // Will create a new circle at the given (x, y) position and the given radius
-void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_delta = RandomFloat(15, 50)) {
+void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_delta = RandomFloat(-90, -15)) {
     Sumo_Circle *result = new Sumo_Circle;
-
 
     result->radius = radius;
     result->position.x = x;
@@ -25,6 +24,10 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
     result->inner.setOutlineColor(sf::Color::Transparent);
     result->inner.setOutlineThickness(-2.0);
 
+    if(RandomInt(0, 5) == 1) {
+        result->pattern = Sumo_Circle::Pattern::Circle;
+    }
+
     Sumo_Circle *old_head = play_state->circle_list;
     result->next = old_head;
     if(old_head) old_head->prev = result;
@@ -39,11 +42,12 @@ void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
     f32 angle = RandomFloat(0, TAU32);
 
 #if 1
-    f32 radius = RandomFloat(play_state->min_radius, play_state->max_radius);
-    f32 x = base->position.x + radius * Sin(angle);
-    x = Clamp(x, 120, VIEW_WIDTH - (120 / 2.0));
+    f32 radius = RandomFloat(play_state->min_radius, play_state->max_radius*0.5f);
+    f32 x = base->position.x + radius * RandomFloat(0.8, 1.4) * Sin(angle);
+    x = Clamp(x, radius, VIEW_WIDTH - (radius / 2.0));
     f32 y = base->position.y + radius * Cos(angle);
-    y = Clamp(y, 120, VIEW_HEIGHT - (120 / 2.0));
+    y = Clamp(y, radius, VIEW_HEIGHT - (radius / 2.0));
+
 #else
     f32 x = RandomFloat(0.2 * VIEW_WIDTH, VIEW_WIDTH - (0.2 * VIEW_WIDTH));
     f32 y = RandomFloat(0.2 * VIEW_HEIGHT, VIEW_HEIGHT - (0.2 * VIEW_HEIGHT));
@@ -52,7 +56,53 @@ void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
     f32 radius = Max(Length(diff), play_state->min_radius);
 #endif
 
-    AddSumoCircle(play_state, x, y, radius, base->shrink_delta + RandomFloat(-0.1, 0.1));
+    AddSumoCircle(play_state, x, y, radius, RandomFloat(-50, -15));
+}
+void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
+    if (play_state->bot_count >= MAX_BOTS) return;
+    Player *player = play_state->bots + play_state->bot_count++;
+
+    player->type = type;
+    player->position = { x, y };
+    player->radius = 20;
+    player->display.setRadius(20);
+    player->brain.action = RandomInt(0,1);
+
+    switch (player->type) {
+        case PlayerType_SumoCat: {
+            player->display.setFillColor(sf::Color::White);
+            player->push_strength = 100;
+            player->move_speed = 250;
+            player->dash_length = 0.1;
+        }
+            break;
+        case PlayerType_LuchadorCat: {
+            player->display.setFillColor(sf::Color(24, 213, 75));
+            player->move_speed = 250;
+            player->push_strength = 60;
+            player->dash_length = 0.2;
+        }
+            break;
+        case PlayerType_AstroCat: {
+            player->display.setFillColor(sf::Color(113, 229, 255));
+
+            player->move_speed = 450;
+            player->push_strength = 10;
+            player->dash_length = 0.4;
+        }
+            break;
+        case PlayerType_DevilCat: {
+            player->display.setFillColor(sf::Color::Red);
+
+            // @Todo
+            player->move_speed = 350;
+            player->push_strength = 20;
+            player->dash_length = 0.2;
+        }
+            break;
+    }
+    player->display.setOrigin(20, 20);
+    player->is_bot = true;
 }
 
 void RemoveSumoCircles(Play_State *play_state) {
@@ -66,7 +116,8 @@ void RemoveSumoCircles(Play_State *play_state) {
             current = prev->next;
 
             play_state->circle_count--;
-            delete current;
+            // @TODO: @James this delete seemed to cause me a crash, though i fear memory leaks without it
+            //delete current;
         }
         else {
             current = current->next;
@@ -82,6 +133,7 @@ void UpdateSumoCircles(Play_State *play_state, f32 delta_time) {
         current->display.setOrigin(current->radius, current->radius);
         current->inner.setRadius(current->radius - 3);
         current->inner.setOrigin(current->radius - 3, current->radius - 3);
+        current->shrink_delta+=Clamp(20*delta_time, -90, 70);
 
         current->should_delete = current->radius <= 10;
         current = current->next;
@@ -107,7 +159,6 @@ void AddPlayer(Play_State *play_state, Player_Type type, f32 x, f32 y) {
         break;
         case PlayerType_LuchadorCat: {
             player->display.setFillColor(sf::Color(24, 213, 75));
-
             player->move_speed = 250;
             player->push_strength = 60;
             player->dash_length = 0.2;
@@ -167,12 +218,10 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time) {
             if (IsButtonPressed(controller->buttons[2 + control_offset]))  { move_direction.x -= 1; }
             if (IsButtonPressed(controller->buttons[3 - control_offset])) { move_direction.x += 1; }
 
-            if (JustButtonPressed(controller->action_bottom)) {
-                speed = DASH_SPEED;
-                DashPlayer(player, 0.2);
-            }
         }
-
+        if (JustButtonPressed(controller->action_bottom)) { speed = DASH_SPEED;
+            DashPlayer(player, 0.2);
+        }
         move_direction = Normalise(move_direction);
         player->move_direction = move_direction;
     }
@@ -186,6 +235,112 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time) {
         player->score_time = 0;
     }
 }
+
+bool CheckBounds(Sumo_Circle *circle_list, sf::Vector2f pos) {
+    if( circle_list) {
+        Sumo_Circle *circle = circle_list;
+        while(circle) {
+            if (SumoCircleHitPos(circle, pos)) return true;
+            circle = circle -> next;
+        }
+    }
+    return false;
+}
+void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
+    bot->brain.timer += delta_time;
+
+    if(bot->brain.timer > bot->brain.planExecute) {
+        switch(bot->brain.action) {
+            case 0:
+            {
+                f32 min = 1000000;
+                bot->brain.targetNum = -1;
+                for (int i = 0; i < play_state->player_count; i++) {
+                    f32 len = Length(bot->position - (play_state->players + i)->position);
+                    if ((play_state->players + i)->alive && len < min &&
+                        CheckBounds(play_state->circle_list, (play_state->bots + i)->position)) {
+                        bot->brain.target = (play_state->players + i)->position;
+                        min = len;
+                        bot->brain.targetNum = i;
+                    }
+                }
+                for (int i = 0; i < play_state->bot_count; i++) {
+                    if ((play_state->bots + i)->position != bot->position) {
+                        f32 len = Length(bot->position - (play_state->bots + i)->position);
+                        if ((play_state->bots + i)->alive && len < min &&
+                            CheckBounds(play_state->circle_list, (play_state->bots + i)->position)) {
+                            bot->brain.target = (play_state->bots + i)->position;
+                            min = len;
+                            bot->brain.targetNum = i + MAX_PLAYERS;
+                        }
+                    }
+                }
+                if(bot->brain.targetNum >= 0)
+                    bot->brain.action = 2;
+                else
+                    bot->brain.action = 1;
+                break;
+            }
+            case 1:
+            {
+                bot->brain.target = play_state->circle_list->position;
+                f32 range = play_state->circle_list->radius * 0.7;
+                bot->brain.target.x += RandomFloat(-range, range);
+                bot->brain.target.y += RandomFloat(-range, range);
+                bot->brain.action = 0;
+                break;
+            }
+            case 2:
+            {
+                u8 targetI = bot->brain.targetNum;
+                if(bot->brain.targetNum > MAX_PLAYERS) {
+                    targetI = bot->brain.targetNum-MAX_PLAYERS;
+                    bot->brain.target = (play_state->bots+targetI)->position;
+                    sf::Vector2f diff = bot->position - (play_state->bots+targetI)->position;
+                    f32 len_sq = Dot(diff, diff);
+                    if(len_sq < 400.0*400.0 &&(play_state->bots+targetI)-> alive) {
+                        bot->brain.wants_dodge = true;
+                    }
+                }
+                else {
+                    bot->brain.target = (play_state->players+targetI)->position;
+                    sf::Vector2f diff = bot->position - (play_state->players+targetI)->position;
+                    f32 len_sq = Dot(diff, diff);
+                    if(len_sq < 400.0*400.0 && (play_state->players+targetI)-> alive) {
+                        bot->brain.wants_dodge = true;
+                    }
+                }
+                bot->brain.action = 1;
+            }
+            break;
+        }
+        bot->brain.timer = 0;
+    }
+
+
+    f32 speed = bot->move_speed;
+    bool has_input = bot->is_dashing;
+    if (bot->is_dashing) {
+        bot->dash_time -= delta_time;
+        bot->is_dashing = bot->dash_time > 0;
+        speed = DASH_SPEED;
+    } else {
+        sf::Vector2f moveDirection(0,0);
+        sf::Vector2f dist_line = bot->brain.target - bot->position;
+        if(Dot(dist_line, dist_line) > 10) {
+            moveDirection = -Normalise(bot->position - bot->brain.target);
+        }
+        bot->move_direction = moveDirection;
+        if(bot->brain.wants_dodge) {
+            DashPlayer(bot, 0.2f);
+            bot->brain.wants_dodge = false;
+        }
+    }
+
+    bot->position += speed * delta_time * bot->move_direction;
+}
+
+
 
 void CheckBounds(Sumo_Circle *circle_list, Player *player) {
     u32 in_count = 0;
@@ -211,8 +366,9 @@ void ResolveCollision(Player *a, Player *b) {
     sf::Vector2f deflect_a = impact_a *  impact;
     sf::Vector2f deflect_b = impact_b * -impact;
 
-    a->move_direction += (deflect_a - deflect_b);
-    b->move_direction += (deflect_b - deflect_a);
+    a->move_direction += (deflect_a - deflect_b)*1.3f;
+    b->move_direction += (deflect_b - deflect_a)*1.3f;
+
 
 
     if (a->is_dashing && b->is_dashing) {
@@ -220,14 +376,14 @@ void ResolveCollision(Player *a, Player *b) {
         b->dash_time = 0.05f;
     }
     else if (a->is_dashing) {
-        f32 push_factor = a->push_strength;
+        f32 push_factor = a->dash_time;
         a->is_dashing = false;
-        DashPlayer(b, push_factor / 100);
+        DashPlayer(b, push_factor);
     }
     else if (b->is_dashing) {
-        f32 push_factor = b->push_strength;
+        f32 push_factor = b->dash_time;
         b->is_dashing = false;
-        DashPlayer(a, push_factor / 100);
+        DashPlayer(a, push_factor);
     }
 
 }
@@ -239,13 +395,13 @@ void CheckCollisions(Play_State *play_state) {
         // Against Every Player
         for (u32 j = i + 1; j < play_state->player_count; ++j) {
             Player *b = play_state->players + j;
-            if (PlayerHitPlayer(a, b)) { ResolveCollision(a, b); }
+            if (PlayerHitPlayer(a, b) && a->alive && b->alive) { ResolveCollision(a, b); }
         }
 
         // Against Every Bot
         for (u32 j = 0; j < play_state->bot_count; ++j) {
             Player *b = play_state->bots + j;
-            if (PlayerHitPlayer(a, b)) { ResolveCollision(a, b); }
+            if (PlayerHitPlayer(a, b) && a->alive && b->alive) { ResolveCollision(a, b); }
         }
     }
 
@@ -255,7 +411,7 @@ void CheckCollisions(Play_State *play_state) {
         // Against Every Bot
         for (u32 j = i + 1; j < play_state->bot_count; ++j) {
             Player *b = play_state->bots + j;
-            if (PlayerHitPlayer(a, b)) { ResolveCollision(a, b); }
+            if (PlayerHitPlayer(a, b) && a->alive && b->alive) { ResolveCollision(a, b); }
         }
     }
 }
@@ -321,7 +477,7 @@ void RenderEntities(Game_Context *context, Play_State *play_state) {
     }
 
     for (u32 i = 0; i < play_state->bot_count; ++i) {
-        Player *bot = play_state->players + i;
+        Player *bot = play_state->bots+ i;
         if (bot->alive) {
             bot->display.setPosition(bot->position);
             context->window->draw(bot->display);
@@ -340,6 +496,12 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
                     RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
                         VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
                             - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
+        }
+        if (JustButtonPressed(controller->action_top)) {
+            AddBot(play_state, PlayerType_DevilCat,
+                      RandomFloat(VIEW_WIDTH / 2.0 - play_state->min_radius,
+                                  VIEW_WIDTH / 2.0 + play_state->min_radius), RandomFloat(VIEW_HEIGHT / 2.0
+                                                                                          - play_state->min_radius, VIEW_HEIGHT / 2.0 + play_state->min_radius));
         }
 
         if (JustButtonPressed(controller->select)) {
@@ -364,15 +526,15 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         }
     }
 
-
-#if 0
     // Update any AI entities involved
     for (u32 i = 0; i < play_state->bot_count; ++i) {
         Player *bot = play_state->bots + i;
-        UpdateBot(bot);
-        CheckBounds(play_state->circle_list, bot);
+        if (bot->alive) {
+            UpdateBot(bot, input->delta_time, play_state);
+            CheckBounds(play_state->circle_list, bot);
+        }
     }
-#endif
+
     // Update Sumo Circles
     UpdateSumoCircles(play_state, input->delta_time);
 
@@ -394,7 +556,7 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     for (u32 i = 0; i < play_state->player_count; ++i) {
         Player *player = play_state->players + i;
         char buffer[256];
-        snprintf(buffer, 256, "Player [%d] Score: %d\n", i + 1, player->score);
+        snprintf(buffer, 256, "Player [%d] Score: %d\n Bot Count %d\n", i + 1, player->score, play_state->bot_count);
         sf::Text text;
         text.setFont(play_state->display_font);
         text.setString(buffer);
@@ -407,15 +569,10 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
 
     // @Todo: Spawn Sumo circles
     if (play_state->time_since_last_circle >= 4
-        || play_state->circle_list->radius < play_state->min_radius * 0.4)
+        || play_state->circle_list->shrink_delta > 50)
     {
         if(play_state->circle_list->pattern == Sumo_Circle::Pattern::Random) {
-            if (play_state->circle_list && play_state->circle_count <= 3) {
-                AddSumoCircle(play_state, play_state->circle_list);
-            } else {
-                AddSumoCircle(play_state, (2 * play_state->max_radius) + (0.1 * VIEW_WIDTH),
-                              (2 * play_state->max_radius) + (0.1 * VIEW_HEIGHT), play_state->max_radius);
-            }
+            AddSumoCircle(play_state, play_state->circle_list);
             play_state->time_since_last_circle = 0;
         }
         else if(play_state->circle_list->pattern == Sumo_Circle::Pattern::Circle) {
@@ -437,8 +594,8 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
         Player *player = play_state->players + i;
         if (!player->alive) continue;
 
-        // @Todo: Dash Trails seperately
         if (player->is_dashing) {
+            sf::Color norm = player->display.getFillColor();
             player->display.setPosition(player->dash_start);
             player->display.setFillColor(sf::Color::White);
             context->window->draw(player->display);
@@ -451,9 +608,32 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
 
                 pos += player->dash_start;
                 shape.setPosition(pos);
-                shape.setFillColor(sf::Color(0, ((i + 1) * (255 / (dash_iters + 1))), 0));
+                shape.setFillColor(sf::Color(((i+1)*(norm.r/(dash_iters+1))),(i+1)*(norm.g/(dash_iters+1)), (i+1)*(norm.b/(dash_iters+1))));
                 context->window->draw(shape);
-                player->display.setFillColor(sf::Color::Green);
+                player->display.setFillColor(norm);
+            }
+        }
+    }
+    for(u32 i = 0; i < play_state->bot_count; ++i) {
+        Player *player = play_state->bots + i;
+        if (!player->alive) continue;
+        if (player->is_dashing) {
+            sf::Color norm = player->display.getFillColor();
+            player->display.setPosition(player->dash_start);
+            player->display.setFillColor(sf::Color::White);
+            context->window->draw(player->display);
+            u32 dash_iters = 3;
+            for (u32 i = 0; i < dash_iters; ++i) {
+                sf::CircleShape shape = player->display;
+                sf::Vector2f pos = (player->position - player->dash_start);
+                pos.x *= (i * (1.0 / 4.0));
+                pos.y *= (i * (1.0 / 4.0));
+
+                pos += player->dash_start;
+                shape.setPosition(pos);
+                shape.setFillColor(sf::Color(((i+1)*(norm.r/(dash_iters+1))),(i+1)*(norm.g/(dash_iters+1)), (i+1)*(norm.b/(dash_iters+1))));
+                context->window->draw(shape);
+                player->display.setFillColor(norm);
             }
         }
     }

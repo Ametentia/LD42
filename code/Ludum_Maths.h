@@ -76,6 +76,15 @@ inline bool SumoCircleHitPlayer(Sumo_Circle *circle, Player *player) {
     return result;
 }
 
+inline bool SumoCircleHitPos(Sumo_Circle *circle, sf::Vector2f pos) {
+    bool result = false;
+    sf::Vector2f diff = circle->position - pos;
+    f32 len_sq = Dot(diff, diff);
+    f32 radius_sum = circle->radius + 1;
+    result = len_sq <= Square(radius_sum);
+    return result;
+}
+
 inline bool Offscreen(sf::Vector2f a) {
     return a.x > VIEW_WIDTH || a.x < 0 || a.y > VIEW_HEIGHT || a.y < 0;
 }
