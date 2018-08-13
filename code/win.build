@@ -14,7 +14,7 @@ MainSource="SFML_${PROJECT}.cpp"
 # Compilation Options
 CompilerFlags="--driver-mode=cl -Od -Zi -Wno-switch -I ../libs/SFML/Win64/include"
 Defines="-D${PROJECT^^}_INTERNAL -D${PROJECT^^}_SLOW -D${PROJECT^^}_WINDOWS"
-LinkerFlags="/LIBPATH:../libs/SFML/Win64/lib sfml-graphics.lib sfml-window.lib sfml-system.lib kernel32.lib"
+LinkerFlags="/LIBPATH:../libs/SFML/Win64/lib sfml-audio.lib sfml-graphics.lib sfml-window.lib sfml-system.lib ogg.lib flac.lib openal32.lib vorbis.lib vorbisenc.lib vorbisfile.lib kernel32.lib"
 
 if [ ! -d "../build" ];
 then
