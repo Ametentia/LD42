@@ -70,30 +70,34 @@ void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
     player->brain.action = RandomInt(0,1);
 
     player->display.setTexture(play_state->player_textures + type);
+
     switch (player->type) {
         case PlayerType_SumoCat: {
             player->push_strength = 100;
             player->move_speed = 250;
             player->dash_length = 0.1;
+            player->charge_needed = 8;
         }
             break;
         case PlayerType_LuchadorCat: {
             player->move_speed = 250;
             player->push_strength = 60;
-            player->dash_length = 0.13;
+            player->dash_length = 0.2;
+            player->charge_needed = 8;
         }
             break;
         case PlayerType_AstroCat: {
             player->move_speed = 450;
             player->push_strength = 10;
-            player->dash_length = 0.15;
+            player->dash_length = 0.4;
+            player->charge_needed = 6;
         }
             break;
         case PlayerType_DevilCat: {
-            // @Todo
             player->move_speed = 350;
             player->push_strength = 20;
-            player->dash_length = 0.13;
+            player->dash_length = 0.2;
+            player->charge_needed = 15;
         }
             break;
     }
@@ -152,26 +156,28 @@ void AddPlayer(Play_State *play_state, Player_Type type, f32 x, f32 y) {
             player->push_strength = 100;
             player->move_speed = 250;
             player->dash_length = 0.1;
+            player->charge_needed = 8;
         }
         break;
         case PlayerType_LuchadorCat: {
             player->move_speed = 250;
             player->push_strength = 60;
             player->dash_length = 0.2;
+            player->charge_needed = 8;
         }
         break;
         case PlayerType_AstroCat: {
             player->move_speed = 450;
             player->push_strength = 10;
             player->dash_length = 0.4;
+            player->charge_needed = 6;
         }
         break;
         case PlayerType_DevilCat: {
-
-            // @Todo
             player->move_speed = 350;
             player->push_strength = 20;
             player->dash_length = 0.2;
+            player->charge_needed = 15;
         }
         break;
     }
@@ -190,6 +196,8 @@ void DashPlayer(Player *player, f32 dash_time) {
 void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, Play_State *play_state) {
     f32 speed = player->move_speed;
     bool has_input = player->is_dashing;
+    if(player->timeLeft < 0)
+        player->chargeTimeup += delta_time;
     player->timeLeft -= delta_time;
     if (player->is_dashing) {
         player->dash_time -= delta_time;
@@ -213,7 +221,7 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, P
             if (IsButtonPressed(controller->buttons[3 - control_offset])) { move_direction.x += 1; }
 
         }
-        if(JustButtonPressed(controller->action_top)) {
+        if(JustButtonPressed(controller->action_top) && player->chargeTimeup > player->charge_needed) {
             switch(player->type) {
                 case PlayerType_AstroCat:
                     {
@@ -230,6 +238,7 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, P
                         }
                         (play_state->bots +index)->position = player->position;
                         player->position = pos;
+                        player->chargeTimeup = 0;
                     }
                     break;
                 case PlayerType_DevilCat:
@@ -246,6 +255,7 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, P
                             }
                         }
                         (play_state->bots +index)->reversed_controls = true;
+                        player->chargeTimeup = 0;
                     }
                 break;
                 case PlayerType_LuchadorCat:
@@ -253,11 +263,13 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, P
                         player->radius = 40;
                         player->display.setRadius(40);
                         player->timeLeft = 5.0f;
+                        player->chargeTimeup = 0;
                     }
                 break;
                 case PlayerType_SumoCat:
                     {
                         player->timeLeft = 5.0;
+                        player->chargeTimeup = 0;
                     }
                 break;
             }
@@ -389,26 +401,109 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
 
 
     f32 speed = bot->move_speed;
+    if(bot->timeLeft < 0) {
+        bot->chargeTimeup+=delta_time;
+    }
+    bot->timeLeft-=delta_time;
     bool has_input = bot->is_dashing;
     if (bot->is_dashing) {
         bot->dash_time -= delta_time;
         bot->is_dashing = bot->dash_time > 0;
         speed = DASH_SPEED;
     } else {
-        sf::Vector2f moveDirection(0,0);
+        if (bot->chargeTimeup > bot->charge_needed && RandomFloat(0, 100) > 90) {
+            switch (bot->type) {
+                case PlayerType_AstroCat: {
+                    f32 min = 1000000;
+                    sf::Vector2f pos;
+                    s32 index = -1;
+                    for (int i = 0; i < play_state->bot_count; i++) {
+                        f32 len = Length(bot->position - (play_state->bots + i)->position);
+                        if ((play_state->bots + i)->alive && len < min) {
+                            pos = (play_state->bots + i)->position;
+                            min = len;
+                            index = i;
+                        }
+                    }
+                    f32 len = Length(bot->position - (play_state->players)->position);
+                    if ((play_state->players)->alive && len < min) {
+                        pos = (play_state->players)->position;
+                        min = len;
+                        (play_state->bots + index)->position = bot->position;
+                        bot->position = pos;
+                        bot->chargeTimeup = 0;
+                    } else {
+                        (play_state->bots + index)->position = bot->position;
+                        bot->position = pos;
+                        bot->chargeTimeup = 0;
+                    }
+                }
+                    break;
+                case PlayerType_DevilCat: {
+                    bot->timeLeft = 2.5f;
+                    f32 min = 1000000;
+                    sf::Vector2f pos;
+                    s32 index = -1;
+                    for (int i = 0; i < play_state->bot_count; i++) {
+                        f32 len = Length(bot->position - (play_state->bots + i)->position);
+                        if ((play_state->bots + i)->alive && len < min) {
+                            min = len;
+                            index = i;
+                        }
+                    }
+                    f32 len = Length(bot->position - (play_state->players)->position);
+                    if ((play_state->players)->alive && len < min) {
+                        play_state->players->reversed_controls = true;
+                        bot->chargeTimeup = 0;
+                    } else {
+                        (play_state->bots + index)->reversed_controls = true;
+                        bot->chargeTimeup = 0;
+                    }
+                }
+                    break;
+                case PlayerType_LuchadorCat: {
+                    bot->radius = 40;
+                    bot->display.setRadius(40);
+                    bot->timeLeft = 5.0f;
+                    bot->chargeTimeup = 0;
+                }
+                    break;
+                case PlayerType_SumoCat: {
+                    bot->timeLeft = 5.0;
+                    bot->chargeTimeup = 0;
+                }
+            }
+        }
+        sf::Vector2f moveDirection(0, 0);
+        if(bot->timeLeft < 0) {
+            switch(bot->type) {
+                case PlayerType_LuchadorCat:
+                {
+                    bot->radius = 20;
+                    bot->display.setRadius(20);
+                }
+                case PlayerType_DevilCat:
+                    for(int i = 0; i < play_state->player_count; i++) {
+                        (play_state->players+i)->reversed_controls = false;
+                    }
+                    for(int i = 0; i < play_state->bot_count; i++) {
+                        (play_state->bots+i)->reversed_controls = false;
+                    }
+                    break;
+            }
+        }
         sf::Vector2f dist_line = bot->brain.target - bot->position;
-        if(Dot(dist_line, dist_line) > 10) {
+        if (Dot(dist_line, dist_line) > 10) {
             moveDirection = -Normalise(bot->position - bot->brain.target);
         }
-        if(bot->reversed_controls) {
+        if (bot->reversed_controls) {
             moveDirection.x = -moveDirection.x;
             moveDirection.y = -moveDirection.y;
             bot->brain.planExecute = 0.15f;
-        }
-        else
+        } else
             bot->brain.planExecute = 0.4f;
         bot->move_direction = moveDirection;
-        if(bot->brain.wants_dodge) {
+        if (bot->brain.wants_dodge) {
             DashPlayer(bot, bot->dash_length);
             bot->brain.wants_dodge = false;
         }
@@ -674,8 +769,8 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     }
 
 
-    bool game_over = play_state->bots[0].alive;
-    for (u32 i = 1; i < play_state->bot_count; ++i) {
+    bool game_over = !play_state->bots[0].alive;
+    for (u32 i = 1; i < play_state->bot_count; i++) {
         game_over &= !play_state->bots[i].alive;
     }
 
@@ -772,13 +867,13 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
 
     for (u32 i = 0; i < play_state->player_count; ++i) {
         Player *player = play_state->players + i;
-        if (player->timeLeft <= 0) {
+        if (player->chargeTimeup > player->charge_needed) {
             // @Todo
             play_state->charge_bars[i].setTexture(play_state->ui_elements + player->type + 4);
         }
         else {
             play_state->charge_bars[i].setTexture(play_state->ui_elements + player->type);
-            f32 width = (1.0 - (player->timeLeft / 20)) * (VIEW_WIDTH / 4.0);
+            f32 width = ((player->chargeTimeup / player->charge_needed)) * (VIEW_WIDTH / 4.0);
             sf::RectangleShape shape;
             shape.setSize(sf::Vector2f(width, 100));
             shape.setPosition(20 + i * (VIEW_WIDTH / 4.0), VIEW_HEIGHT - 100);
@@ -794,13 +889,13 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     f32 offset = (play_state->player_count * (VIEW_WIDTH / 4.0));
     for (u32 i = 0; i < play_state->bot_count; ++i) {
         Player *bot = play_state->bots + i;
-        if (bot->timeLeft <= 0) {
+        if (bot->chargeTimeup >= bot->charge_needed) {
             // @Todo
             play_state->charge_bars[i + play_state->player_count].setTexture(play_state->ui_elements + bot->type + 4);
         }
         else {
             play_state->charge_bars[i + play_state->player_count].setTexture(play_state->ui_elements + bot->type);
-            f32 width = (1.0 - (bot->timeLeft / 20)) * (VIEW_WIDTH / 4.0);
+            f32 width = ((bot->chargeTimeup / bot->charge_needed)) * (VIEW_WIDTH / 4.0);
             sf::RectangleShape shape;
             shape.setSize(sf::Vector2f(width, 100));
             shape.setPosition(20 + offset + i * (VIEW_WIDTH / 4.0), VIEW_HEIGHT - 100);
@@ -873,6 +968,10 @@ void UpdateRenderCharacterSelect(Game_Context *context, Character_Select_State *
             position = positions[i];
             AddBot(play_state, type, position.x, position.y);
         }
+
+        character_select->music.stop();
+        play_state->music.setVolume(20);
+        play_state->music.play();
 
         CleanupState(old_state);
         return;
@@ -952,6 +1051,8 @@ void UpdateRenderGameOver(Game_Context *context, Game_Over_State *game_over) {
 
         State *old_state = SetState(context, CreateStateFromType(StateType_Play));
         Play_State *play_state = context->current_state->play_state;
+        play_state->music.setVolume(20);
+        play_state->music.play();
 
         play_state->min_radius = 320;
         play_state->max_radius = 500;
@@ -1047,7 +1148,7 @@ void UpdateRenderGame(Game_Context *context) {
         }
         break;
         case StateType_Play: {
-            UpdateRenderPlayState(context, current->play_state);
+                    UpdateRenderPlayState(context, current->play_state);
         }
         break;
         case StateType_CharacterSelect: {

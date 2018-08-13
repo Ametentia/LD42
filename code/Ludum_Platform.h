@@ -166,6 +166,8 @@ struct Player {
     f32 dash_length;
     //@Note: power variables
     f32 timeLeft;
+    f32 charge_needed;
+    f32 chargeTimeup;
 
     // The players radius may change because of special moves
     f32 radius;
@@ -185,7 +187,8 @@ struct Player {
     Player() {
         score = 0;
         score_time = 0;
-        timeLeft = 20;
+        chargeTimeup = 0;
+        timeLeft = 0;
         push_strength = 0.2f;
         is_dashing = false;
         dash_time = 0;

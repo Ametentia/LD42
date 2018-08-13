@@ -31,6 +31,7 @@ struct Logo_State {
 
 struct Menu_State {
     sf::Texture background;
+    sf::Music music;
     sf::RectangleShape background_shape;
 
     sf::Texture start;
@@ -57,12 +58,14 @@ struct Menu_State {
         start_shape.setTexture(&start);
         start_shape.setPosition(VIEW_WIDTH / 2.0 - (size.x / 2.0) + 45,
                 VIEW_HEIGHT - (size.y) - 60);
+        Assert(music.openFromFile("8bit.wav"));
     }
 };
 
 struct Character_Select_State {
     sf::Texture characters[4];
     sf::Texture characters_gray[4];
+    sf::Music music;
     sf::RectangleShape character_shapes[4];
 
     sf::Texture ready_texture;
@@ -84,6 +87,7 @@ struct Character_Select_State {
         Assert(characters_gray[1].loadFromFile("LuchadoreUnselected.png"));
         Assert(characters_gray[2].loadFromFile("AstroUnselected.png"));
         Assert(characters_gray[3].loadFromFile("DevilUnselected.png"));
+
 
         for (u32 i = 0; i < 4; ++i) {
             sf::RectangleShape *shape = character_shapes + i;
@@ -109,6 +113,8 @@ struct Character_Select_State {
 
 struct Play_State {
     sf::Texture player_textures[4];
+    sf::Music music;
+
 
     // @Note: For supers
     sf::Texture ui_elements[8];
@@ -145,6 +151,7 @@ struct Play_State {
         Assert(player_textures[2].loadFromFile("AstroBall.png"));
         Assert(player_textures[3].loadFromFile("DevilBall.png"));
 
+        Assert(music.openFromFile("heavyloses.wav"));
         Assert(ui_elements[0].loadFromFile("SumoBarEmpty.png"));
         Assert(ui_elements[1].loadFromFile("LuchadoreBarEmpty.png"));
         Assert(ui_elements[2].loadFromFile("AstroBarEmpty.png"));
@@ -185,6 +192,7 @@ struct Game_Over_State {
         Assert(char_display[3].loadFromFile("DevilCat.png"));
     }
 };
+
 
 struct State {
    State_Type type;
