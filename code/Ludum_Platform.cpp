@@ -40,24 +40,23 @@ void AddSumoCircle(Play_State *play_state, f32 x, f32 y, f32 radius, f32 shrink_
 
 // Will create a new circle relative to the one given
 void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
-    f32 angle = RandomFloat(0, TAU32);
+    bool outside = true;
+    sf::FloatRect rect(sf::Vector2f(200, 350), sf::Vector2f(VIEW_WIDTH-200, VIEW_HEIGHT-350));
+    while(outside) {
+        f32 angle = RandomFloat(0, TAU32);
+        f32 radius = RandomFloat(play_state->min_radius, play_state->max_radius * 0.5f);
+        f32 x = base->position.x + radius * RandomFloat(0.8, 1.4) * Sin(angle);
+        x = Clamp(x, radius, VIEW_WIDTH - (radius / 2.0));
+        f32 y = base->position.y + radius * Cos(angle);
+        y = Clamp(y, radius, VIEW_HEIGHT - (radius / 2.0));
+        printf("%d\n", x+radius < rect.width);
+        if(x+radius < rect.width || x-radius > rect.left || y-radius > rect.top || y+radius < rect.height) {
+            AddSumoCircle(play_state, x, y, radius, RandomFloat(-50, -15));
+            outside = false;
+        }
+    }
 
-#if 1
-    f32 radius = RandomFloat(play_state->min_radius, play_state->max_radius*0.5f);
-    f32 x = base->position.x + radius * RandomFloat(0.8, 1.4) * Sin(angle);
-    x = Clamp(x, radius, VIEW_WIDTH - (radius / 2.0));
-    f32 y = base->position.y + radius * Cos(angle);
-    y = Clamp(y, radius, VIEW_HEIGHT - (radius / 2.0));
 
-#else
-    f32 x = RandomFloat(0.2 * VIEW_WIDTH, VIEW_WIDTH - (0.2 * VIEW_WIDTH));
-    f32 y = RandomFloat(0.2 * VIEW_HEIGHT, VIEW_HEIGHT - (0.2 * VIEW_HEIGHT));
-
-    sf::Vector2f diff = base->position - sf::Vector2f(x, y);
-    f32 radius = Max(Length(diff), play_state->min_radius);
-#endif
-
-    AddSumoCircle(play_state, x, y, radius, RandomFloat(-50, -15));
 }
 void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
     if (play_state->bot_count >= MAX_BOTS) return;
@@ -77,7 +76,7 @@ void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
             player->push_strength = 100;
             player->move_speed = 250;
             player->dash_length = 0.1;
-            player->charge_needed = 8;
+            player->charge_needed = 12;
         }
             break;
         case PlayerType_LuchadorCat: {
@@ -269,7 +268,7 @@ void UpdatePlayer(Player *player, Game_Controller *controller, f32 delta_time, P
                 break;
                 case PlayerType_SumoCat:
                     {
-                        player->timeLeft = 5.0;
+                        player->timeLeft = 3.0;
                         player->chargeTimeup = 0;
                     }
                 break;
@@ -470,7 +469,7 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
                 }
                     break;
                 case PlayerType_SumoCat: {
-                    bot->timeLeft = 5.0;
+                    bot->timeLeft = 3.0;
                     bot->chargeTimeup = 0;
                 }
             }

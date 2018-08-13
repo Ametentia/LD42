@@ -24,7 +24,7 @@ int main() {
     srand(time(0));
     sf::Clock clock;
 
-    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Ludum Dare 42",
+    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "NEK.O",
             sf::Style::Close | sf::Style::Titlebar);
     window.setFramerateLimit(60);
 
