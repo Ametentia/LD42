@@ -220,14 +220,14 @@ void ResolveCollision(Player *a, Player *b) {
         b->dash_time = 0.05f;
     }
     else if (a->is_dashing) {
-        f32 push_factor = a->push_strength / 100.0;
+        f32 push_factor = a->push_strength;
         a->is_dashing = false;
-        DashPlayer(b, 0.3 * push_factor);
+        DashPlayer(b, push_factor / 100);
     }
     else if (b->is_dashing) {
-        f32 push_factor = b->push_strength / 250.0;
+        f32 push_factor = b->push_strength;
         b->is_dashing = false;
-        DashPlayer(a, 0.3 * push_factor);
+        DashPlayer(a, push_factor / 100);
     }
 
 }
@@ -436,8 +436,6 @@ void UpdateRenderPlayState(Game_Context *context, Play_State *play_state) {
     for (u32 i = 0; i < play_state->player_count; ++i) {
         Player *player = play_state->players + i;
         if (!player->alive) continue;
-
-//        UpdatePlayer(play_state->players + i, GetGameController(input, i), input->delta_time);
 
         // @Todo: Dash Trails seperately
         if (player->is_dashing) {

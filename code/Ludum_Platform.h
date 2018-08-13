@@ -136,6 +136,8 @@ struct Player {
     f32 score_time;
     u32 hit_count; // How many Sumo_Circles the player is inside of
 
+
+    bool is_bot;
     bool reversed_controls;
 
     // @Note: Stats
@@ -158,6 +160,8 @@ struct Player {
 
     Player() {
         score = 0;
+        score_time = 0;
+        push_strength = 0.2f;
         is_dashing = false;
         dash_time = 0;
 
@@ -166,6 +170,7 @@ struct Player {
         alive = true;
 
         reversed_controls = false;
+        is_bot = false;
     }
 };
 
