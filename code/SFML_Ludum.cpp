@@ -1,5 +1,4 @@
 #include <SFML/Graphics.hpp>
-
 // @Note: Configuration
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
