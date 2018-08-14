@@ -1,5 +1,7 @@
 #if LUDUM_WINDOWS
 #include <windows.h>
+#else
+#include <unistd.h>
 #endif
 
 #include <SFML/Graphics.hpp>
