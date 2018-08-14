@@ -58,6 +58,7 @@ void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
 
 
 }
+
 void AddBot(Play_State *play_state, Player_Type type, f32 x, f32 y) {
     if (play_state->bot_count >= MAX_BOTS) return;
     Player *player = play_state->bots + play_state->bot_count++;
@@ -1021,7 +1022,21 @@ void UpdateRenderCharacterSelect(Game_Context *context, Character_Select_State *
 void UpdateRenderMenuState(Game_Context *context, Menu_State *menu_state) {
     Game_Input *input = context->input;
     Game_Controller *controller = GetGameController(input, 0);
-    for (u32 i = 0; i < ArrayCount(controller->buttons); ++i) {
+    if (JustButtonPressed(controller->select)) {
+        if (context->fullscreen) {
+            context->window->create(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "NEK.O.", sf::Style::Close);
+            context->window->setFramerateLimit(60);
+        }
+        else {
+            context->window->create(sf::VideoMode(VIEW_WIDTH, VIEW_HEIGHT), "NEK.O.", sf::Style::Fullscreen);
+            context->window->setFramerateLimit(60);
+        }
+    }
+    else if (JustButtonPressed(controller->start)) {
+        input->requested_quit = true;
+    }
+
+    for (u32 i = 0; i < ArrayCount(controller->buttons) - 2; ++i) {
         if (JustButtonPressed(controller->buttons[i])) {
             State *old_state = SetState(context, CreateStateFromType(StateType_CharacterSelect));
             CleanupState(old_state);
@@ -1083,6 +1098,10 @@ void UpdateRenderGameOver(Game_Context *context, Game_Over_State *game_over) {
         State *old_state = SetState(context, CreateStateFromType(StateType_CharacterSelect));
         CleanupState(old_state);
         return;
+    }
+    else if (JustButtonPressed(controller->start)) {
+        State *old_state = SetState(context, CreateStateFromType(StateType_MainMenu));
+        CleanupState(old_state);
     }
 
     if (game_over->won) {

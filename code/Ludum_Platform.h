@@ -236,6 +236,7 @@ struct Game_Context {
     sf::RenderWindow *window;
     Game_Input *input;
     State *current_state;
+    bool fullscreen;
 };
 
 #endif  // LUDUM_PLATFORM_H_
