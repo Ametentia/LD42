@@ -1,3 +1,7 @@
+#if LUDUM_WINDOWS
+#include <windows.h>
+#endif
+
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
 // @Note: Configuration
@@ -20,9 +24,19 @@ internal void SFMLProcessGameButton(Game_Button *current, Game_Button *prev, boo
     current->transitions = (current->is_pressed != prev->is_pressed) ? 1 : 0;
 }
 
+#if LUDUM_WINDOWS
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd, int nCmdShow) {
+#else
 int main() {
+#endif
     srand(time(0));
     sf::Clock clock;
+
+#if LUDUM_WINDOWS
+    SetCurrentDirectory("..\\data");
+#else
+    chdir("../data");
+#endif
 
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "NEK.O",
             sf::Style::Close | sf::Style::Titlebar);
