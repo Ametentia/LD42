@@ -49,8 +49,7 @@ void AddSumoCircle(Play_State *play_state, Sumo_Circle *base) {
         x = Clamp(x, radius, VIEW_WIDTH - (radius / 2.0));
         f32 y = base->position.y + radius * Cos(angle);
         y = Clamp(y, radius, VIEW_HEIGHT - (radius / 2.0));
-        printf("%d\n", x+radius < rect.width);
-        if(x+radius < rect.width || x-radius > rect.left || y-radius > rect.top || y+radius < rect.height) {
+        if(x-radius < rect.width || x+radius > rect.left || y-radius > rect.top || y+radius < rect.height) {
             AddSumoCircle(play_state, x, y, radius, RandomFloat(-50, -15));
             outside = false;
         }
@@ -429,8 +428,7 @@ void UpdateBot(Player *bot, f32 delta_time, Play_State *play_state) {
                     f32 len = Length(bot->position - (play_state->players)->position);
                     if ((play_state->players)->alive && len < min) {
                         pos = (play_state->players)->position;
-                        min = len;
-                        (play_state->bots + index)->position = bot->position;
+                        (play_state->players + index)->position = bot->position;
                         bot->position = pos;
                         bot->chargeTimeup = 0;
                     } else {
